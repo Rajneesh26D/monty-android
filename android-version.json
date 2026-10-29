@@ -1,5 +1,5 @@
 {
-  "versionCode": 20101,
-  "versionName": "2.1.1",
-  "notes": "Fix PDF maths fractions, duplicated variable glyphs and broken equation brackets. Existing imported questions recover their source layout when opened, preserving edits, answers and progress."
+  "versionCode": 20102,
+  "versionName": "2.1.2",
+  "notes": "Open PDFs and images with Android's Open with chooser and installed viewer apps, instead of the share sheet or in-app image preview."
 }

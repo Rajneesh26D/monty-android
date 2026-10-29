@@ -1,11 +1,12 @@
 import { useRef, useState } from 'react';
+import { Capacitor } from '@capacitor/core';
 import { Upload, Pin, Pencil, Trash2, FileText } from 'lucide-react';
 import type { State } from '../../shared/types';
 import type { Commit } from '../services/importer';
 import { addNote } from '../services/workspace';
 import { removeAttachment } from '../storage/repository';
 import { FileViewer } from './FileViewer';
-import { isPdf, openPdfInApp } from '../services/openPdf';
+import { isPdf, openPdfInApp, openImageInApp } from '../services/openPdf';
 export function NotesPanel({
   folderId,
   state,
@@ -67,6 +68,12 @@ export function NotesPanel({
             className="file-open"
             onClick={() => {
               if (isPdf(n.name, n.mime)) void openPdfInApp(n, notify);
+              else if (
+                Capacitor.isNativePlatform() &&
+                (n.mime.startsWith('image/') ||
+                  /\.(jpe?g|png|webp|gif|hei[cf]|bmp|svg)$/i.test(n.name))
+              )
+                void openImageInApp(n, notify);
               else setOpened(n.id);
             }}
           >

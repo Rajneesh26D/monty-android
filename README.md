@@ -124,3 +124,11 @@ npx vitest run --exclude tests/parser.test.ts --exclude tests/monty-parser.test.
 ## Maths layout fix in 2.1.1
 
 Both web and Android use the shared PDF layout recovery for algebraic fractions, mathematical letter encodings, grouping brackets and superscripts. Already-imported Maths questions are repaired on opening from their original PDF, without reimporting or resetting progress. A corrected local view is cached for offline study; the first recovery needs access to the original PDF. Source banks and manually edited text are preserved.
+
+## Opening files in 2.1.2
+
+Tapping a PDF or image in Android opens the system **Open with** chooser for
+compatible installed apps, including viewers provided by Drive or gallery apps.
+The original bytes are copied to app-private cache and exposed through a
+read-only FileProvider URI. This uses Android ACTION_VIEW, not sharing, and
+needs no broad storage permission. Image previews in the web app are retained.
