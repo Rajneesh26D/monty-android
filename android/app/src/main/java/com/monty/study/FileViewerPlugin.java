@@ -24,7 +24,8 @@ public class FileViewerPlugin extends Plugin {
             if (!file.getPath().startsWith(allowed.getPath() + File.separator) || !file.isFile()) throw new IllegalArgumentException();
             Uri uri = FileProvider.getUriForFile(getContext(), getContext().getPackageName() + ".fileprovider", file);
             Intent view = new Intent(Intent.ACTION_VIEW).setDataAndType(uri, mime)
-                .setClipData(ClipData.newRawUri("Monty file", uri)).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            view.setClipData(ClipData.newRawUri("Monty file", uri));
             Intent chooser = Intent.createChooser(view, "Open with").addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
             getActivity().startActivity(chooser);
             call.resolve();
