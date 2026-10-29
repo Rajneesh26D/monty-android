@@ -96,7 +96,14 @@ final class UpdateService {
         File directory = new File(c.getCacheDir(), "updates");
         if (!directory.isDirectory() && !directory.mkdirs()) throw new IOException("Could not create update storage.");
         if (directory.getUsableSpace() < m.size + 32L * 1024 * 1024) throw new IOException("Free some phone storage before downloading the update.");
-        File file = new File(directory, "monty-update.apk");
+        File file = new File(directory, "monty-" + m.versionCode + "-" + m.sha256.substring(0, 16) + ".apk");
+        if (file.isFile() && file.length() == m.size) {
+            try (InputStream in = new FileInputStream(file)) {
+                MessageDigest cached = MessageDigest.getInstance("SHA-256"); byte[] buffer = new byte[65536]; int n;
+                while ((n = in.read(buffer)) != -1) cached.update(buffer, 0, n);
+                if (hex(cached.digest()).equals(m.sha256)) { verifyPackage(c, file, m); return file; }
+            }
+        }
         if (file.exists() && !file.delete()) throw new IOException("Could not replace the previous update download.");
         HttpURLConnection connection = connect(m.url);
         boolean verified = false;
@@ -142,10 +149,20 @@ final class UpdateService {
         if (code != m.versionCode || !m.versionName.equals(apk.versionName) || code <= installedCode(c) ||
             !signers(apk).equals(signers(installed))) throw new IOException("This APK does not match Monty's version or signing key.");
     }
-    static void install(Context c, File file) {
-        Uri uri = FileProvider.getUriForFile(c, c.getPackageName() + ".fileprovider", file);
-        Intent intent = new Intent(Intent.ACTION_VIEW).setDataAndType(uri, "application/vnd.android.package-archive")
-            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK);
-        c.startActivity(intent);
+    static void install(Context c, File file) throws Exception {
+        PackageInstaller installer=c.getPackageManager().getPackageInstaller();
+        PackageInstaller.SessionParams params=new PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL);
+        params.setAppPackageName(c.getPackageName()); params.setSize(file.length());
+        if(Build.VERSION.SDK_INT>=31) params.setRequireUserAction(PackageInstaller.SessionParams.USER_ACTION_REQUIRED);
+        int id=installer.createSession(params);
+        try(PackageInstaller.Session session=installer.openSession(id)) {
+            try(InputStream in=new FileInputStream(file);OutputStream out=session.openWrite("base.apk",0,file.length())) {
+                FileTransfer.copy(in,out,file.length());session.fsync(out);
+            }
+            Intent callback=new Intent(c,UpdateInstallReceiver.class).setAction(c.getPackageName()+".UPDATE_RESULT");
+            PendingIntent pending=PendingIntent.getBroadcast(c,id,callback,PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_MUTABLE);
+            prefs(c).edit().putInt("installStatus",PackageInstaller.STATUS_PENDING_USER_ACTION).putInt("installSession",id).putLong("installVersion",installedCode(c)).putString("installMessage","Preparing Android's update confirmation…").apply();
+            session.commit(pending.getIntentSender());
+        }catch(Exception error){installer.abandonSession(id);throw error;}
     }
 }

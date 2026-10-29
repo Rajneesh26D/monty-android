@@ -72,28 +72,26 @@ export async function loadState(): Promise<State> {
       await tx.objectStore('state').put(migrated, 'current');
       if (legacy) await tx.objectStore('private').put(legacy, 'before-native-cloud-migration');
       const old: CloudMeta = (await tx.objectStore('private').get('cloud')) || initialMeta();
-      await tx
-        .objectStore('private')
-        .put(
-          {
-            ...old,
-            dirty: old.dirty || hasLibraryData(migrated),
-            pdfs: [
-              ...new Set([
-                ...old.pdfs,
-                ...migrated.documents.filter((d) => !d.hash.startsWith('legacy:')).map((d) => d.id),
-              ]),
-            ],
-            files: [
-              ...new Set([
-                ...(old.files || []),
-                ...Object.keys(migrated.monty?.attachments || {}),
-                ...Object.keys(migrated.monty?.banks || {}),
-              ]),
-            ],
-          },
-          'cloud',
-        );
+      await tx.objectStore('private').put(
+        {
+          ...old,
+          dirty: old.dirty || hasLibraryData(migrated),
+          pdfs: [
+            ...new Set([
+              ...old.pdfs,
+              ...migrated.documents.filter((d) => !d.hash.startsWith('legacy:')).map((d) => d.id),
+            ]),
+          ],
+          files: [
+            ...new Set([
+              ...(old.files || []),
+              ...Object.keys(migrated.monty?.attachments || {}),
+              ...Object.keys(migrated.monty?.banks || {}),
+            ]),
+          ],
+        },
+        'cloud',
+      );
       await tx.objectStore('private').put(true, 'native-cloud-migrated');
       await tx.done;
     }
@@ -589,6 +587,15 @@ export async function saveAttachment(id: string, bytes: Uint8Array | Blob, mime:
     }));
     scheduleCloud();
   }
+}
+// Only inspect local storage: Android streams remote originals itself.
+export async function readLocalFileBlob(id: string, legacy = false): Promise<Blob | null> {
+  if (legacy) {
+    const bytes = await (await browser()).get('pdfs', id);
+    return bytes ? new Blob([new Uint8Array(bytes)], { type: 'application/pdf' }) : null;
+  }
+  const file = await (await assets()).get('files', id);
+  return file ? file.blob || new Blob([new Uint8Array(file.bytes)], { type: file.mime }) : null;
 }
 export async function readAttachment(id: string): Promise<{ bytes: Uint8Array; mime: string }> {
   const db = await assets();

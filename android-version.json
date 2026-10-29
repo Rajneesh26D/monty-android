@@ -1,5 +1,5 @@
 {
-  "versionCode": 20102,
-  "versionName": "2.1.2",
-  "notes": "Open PDFs and images with Android's Open with chooser and installed viewer apps, instead of the share sheet or in-app image preview."
+  "versionCode": 20103,
+  "versionName": "2.1.3",
+  "notes": "Fix large-file opening with bounded transfers and reusable native caching. Improve in-place updates with Android installation sessions and explicit failure reporting."
 }

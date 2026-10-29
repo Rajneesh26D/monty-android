@@ -132,3 +132,20 @@ compatible installed apps, including viewers provided by Drive or gallery apps.
 The original bytes are copied to app-private cache and exposed through a
 read-only FileProvider URI. This uses Android ACTION_VIEW, not sharing, and
 needs no broad storage permission. Image previews in the web app are retained.
+
+## Large files and installation in 2.1.3
+
+Android no longer sends an entire PDF/image as one Base64 bridge message.
+It reuses native cached files, copies local Blobs in bounded 512 KiB chunks,
+and streams remote originals directly to disk. Partial copies are never opened.
+The original file needs one preparation/download; later taps use the cached copy.
+
+In-app updates use Android PackageInstaller sessions with explicit approval and
+installation status/error reporting, preserving the package and release key.
+APKs use version-specific cache filenames so retries cannot overwrite a file
+that an installer is reading. Release CI installs the actual 2.1.2 universal APK
+on an Android 16 emulator, seeds private file/preferences/SQLite data, then
+installs the new APK with replacement enabled and verifies the data survived.
+A generated 135 MB stream also tests bounded native copying without a whole-file
+allocation. Physical-device installer failures may still require the exact OS
+failure reason; do not uninstall merely to work around a stalled update.

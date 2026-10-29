@@ -105,6 +105,7 @@ export function Updates() {
         <a href={releasesUrl} target="_blank" rel="noreferrer">
           Download Monty for Android
         </a>
+        {status?.installMessage && <p role="status">{status.installMessage}</p>}
         {message && <p role="status">{message}</p>}
         {error && <p role="alert">{error}</p>}
       </section>

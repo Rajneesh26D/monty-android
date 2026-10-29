@@ -12,6 +12,8 @@ export interface UpdateStatus {
   notificationsEnabled: boolean;
   notificationsAllowed: boolean;
   lastChecked: number;
+  installMessage?: string;
+  packageName?: string;
 }
 export interface UpdateResult {
   available: boolean;

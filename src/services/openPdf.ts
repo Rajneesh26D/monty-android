@@ -11,16 +11,16 @@ export async function openPdfInApp(
 ) {
   notify('Opening PDF…');
   try {
-    const bytes = source.legacy
-      ? await readPdf(source.id)
-      : (await readAttachment(source.id)).bytes;
     const name = /\.pdf$/i.test(source.name) ? source.name : source.name + '.pdf';
     if (Capacitor.isNativePlatform()) {
       const { openNativeFile } = await import('./openNativeFile');
-      await openNativeFile(bytes, name, 'application/pdf');
+      await openNativeFile({ ...source, name, mime: 'application/pdf' });
       notify('');
       return;
     }
+    const bytes = source.legacy
+      ? await readPdf(source.id)
+      : (await readAttachment(source.id)).bytes;
     if (!Capacitor.isNativePlatform() && navigator.share && navigator.canShare) {
       // Web Share opens the phone's system sheet. Cloud reads can outlive the
       // browser's user activation; in that case downloading still works.
@@ -55,7 +55,6 @@ export async function openImageInApp(
 ) {
   notify('Opening image…');
   try {
-    const file = await readAttachment(source.id);
     const { openNativeFile } = await import('./openNativeFile');
     const extension = source.name.split('.').at(-1)?.toLowerCase();
     const known: Record<string, string> = {
@@ -69,11 +68,10 @@ export async function openImageInApp(
       bmp: 'image/bmp',
       svg: 'image/svg+xml',
     };
-    await openNativeFile(
-      file.bytes,
-      source.name,
-      source.mime.startsWith('image/') ? source.mime : known[extension || ''] || file.mime,
-    );
+    await openNativeFile({
+      ...source,
+      mime: source.mime.startsWith('image/') ? source.mime : known[extension || ''] || 'image/jpeg',
+    });
     notify('');
   } catch (error) {
     notify(error instanceof Error ? error.message : 'Could not open this image.');

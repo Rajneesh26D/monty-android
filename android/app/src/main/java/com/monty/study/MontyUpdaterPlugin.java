@@ -20,6 +20,11 @@ public class MontyUpdaterPlugin extends Plugin {
             status.put("notificationsEnabled", UpdateService.prefs(getContext()).getBoolean("notifications", false));
             status.put("notificationsAllowed", UpdateService.notificationsAllowed(getContext()));
             status.put("lastChecked", UpdateService.prefs(getContext()).getLong("lastChecked", 0));
+            String installMessage = UpdateService.prefs(getContext()).getString("installMessage", "");
+            long fromVersion = UpdateService.prefs(getContext()).getLong("installVersion", 0);
+            if (fromVersion > 0 && UpdateService.installedCode(getContext()) > fromVersion) installMessage = "Update installed successfully.";
+            status.put("installMessage", installMessage);
+            status.put("packageName", getContext().getPackageName());
             status.put("architecture", UpdateService.arm64() ? "arm64-v8a" : "universal");
             call.resolve(status);
         } catch (Exception e) { call.reject("Could not read app version."); }
