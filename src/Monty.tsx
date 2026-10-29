@@ -44,11 +44,16 @@ export default function Monty() {
   useEffect(() => {
     let disposed = false;
     let cleanup: (() => void) | undefined;
-    void initializeUpdates(() => setSettings(true)).then((remove) => {
-      if (disposed) remove();
-      else cleanup = remove;
-    }).catch(() => {});
-    return () => { disposed = true; cleanup?.(); };
+    void initializeUpdates(() => setSettings(true))
+      .then((remove) => {
+        if (disposed) remove();
+        else cleanup = remove;
+      })
+      .catch(() => {});
+    return () => {
+      disposed = true;
+      cleanup?.();
+    };
   }, []);
   const notify = (s: string) => {
     setToast(s);

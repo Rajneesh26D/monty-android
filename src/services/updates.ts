@@ -46,7 +46,11 @@ export async function initializeUpdates(openSettings: () => void): Promise<() =>
   const stateListener = await App.addListener('appStateChange', ({ isActive }) => {
     if (isActive) check();
   });
-  try { open((await App.getLaunchUrl())?.url); } catch { /* A normal launch has no URL. */ }
+  try {
+    open((await App.getLaunchUrl())?.url);
+  } catch {
+    /* A normal launch has no URL. */
+  }
   check();
   return () => {
     active = false;

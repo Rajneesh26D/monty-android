@@ -10,7 +10,7 @@
     "preview": "vite preview --outDir client-dist --host 0.0.0.0",
     "check": "tsc --noEmit && tsc --noEmit -p tsconfig.server.json",
     "test:hosted": "playwright test --config playwright.hosted.config.ts",
-    "build:android:web": "tsc --noEmit && vite build --outDir android-dist",
+    "build:android:web": "node scripts/generate-license-notices.mjs && tsc --noEmit && vite build --outDir android-dist",
     "android:sync": "npm run build:android:web && cap sync android"
   },
   "dependencies": {

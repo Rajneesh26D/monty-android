@@ -27,6 +27,8 @@ jobs:
           distribution: temurin
           java-version: '21'
       - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
       - name: Install Android 16 SDK and accept SDK licenses
         run: |
           yes | sdkmanager --licenses > /dev/null || true
@@ -36,6 +38,9 @@ jobs:
       - name: Core and updater tests (personal PDF fixtures are not published)
         run: npx vitest run --exclude tests/parser.test.ts --exclude tests/monty-parser.test.ts
       - run: npm run android:sync
+      - name: Native tests and Android lint
+        working-directory: android
+        run: ./gradlew testDebugUnitTest lintRelease --no-daemon
       - name: Restore release signing key from the repository secret
         env:
           MONTY_SIGNING_BUNDLE: ${{ secrets.MONTY_SIGNING_BUNDLE }}
@@ -60,9 +65,9 @@ jobs:
         id: version
         run: |
           node -e 'const fs=require("fs"),v=require("./android-version.json");if(!/^\d+\.\d+\.\d+$/.test(v.versionName)||!Number.isSafeInteger(v.versionCode)||v.versionCode<=0)throw Error("Invalid version");fs.appendFileSync(process.env.GITHUB_OUTPUT,`name=${v.versionName}\ncode=${v.versionCode}\n`);'
-      - name: Native tests, Android lint, and signed APK builds
+      - name: Signed APK builds
         working-directory: android
-        run: ./gradlew testDebugUnitTest lintRelease assembleRelease --no-daemon -PmontyVersionName=${{ steps.version.outputs.name }} -PmontyVersionCode=${{ steps.version.outputs.code }}
+        run: ./gradlew assembleRelease --no-daemon -PmontyVersionName=${{ steps.version.outputs.name }} -PmontyVersionCode=${{ steps.version.outputs.code }}
       - run: node scripts/package-android-release.mjs
       - name: Verify signatures and Android 16 native library alignment
         run: |
