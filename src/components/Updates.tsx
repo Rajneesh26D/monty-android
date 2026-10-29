@@ -9,6 +9,7 @@ export function Updates() {
   const [busy, setBusy] = useState('');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [licenses, setLicenses] = useState('');
   useEffect(() => {
     let active = true;
     const refresh = () =>
@@ -148,6 +149,26 @@ export function Updates() {
           Checks run when Monty opens and about every six hours while notifications are on. Battery
           settings can delay background checks.
         </p>
+        <details
+          onToggle={(event) => {
+            if (event.currentTarget.open && !licenses) {
+              void fetch('/third-party-notices.txt')
+                .then((response) => {
+                  if (!response.ok) throw new Error();
+                  return response.text();
+                })
+                .then(setLicenses)
+                .catch(() =>
+                  setLicenses('License notices are included with the app source on GitHub.'),
+                );
+            }
+          }}
+        >
+          <summary>Third-party licenses</summary>
+          <pre style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', fontSize: 12 }}>
+            {licenses || 'Opening license notices…'}
+          </pre>
+        </details>
       </section>
     </>
   );

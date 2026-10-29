@@ -1,4 +1,5 @@
 apply plugin: 'com.android.application'
+def montyVersion = new groovy.json.JsonSlurper().parse(rootProject.file('../android-version.json'))
 
 android {
     namespace = "com.monty.study"
@@ -7,8 +8,8 @@ android {
         applicationId "com.monty.study"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode Integer.parseInt(project.findProperty('montyVersionCode') ?: '20001')
-        versionName project.findProperty('montyVersionName') ?: '2.0.1'
+        versionCode Integer.parseInt(project.findProperty('montyVersionCode') ?: montyVersion.versionCode.toString())
+        versionName project.findProperty('montyVersionName') ?: montyVersion.versionName
         buildConfigField 'String', 'UPDATE_REPOSITORY', '"Rajneesh26D/monty-android"'
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
