@@ -2047,3 +2047,6 @@ progress::-moz-progress-bar {
   cursor: pointer;
 }
 .update-notification-option input { width: 22px; height: 22px; accent-color: #173e38; }
+.pairing-code { font-family: ui-monospace, monospace; font-size: clamp(16px, 4vw, 23px); font-weight: 700; padding: 14px 10px; background: #edf1e6; border-radius: 10px; overflow-wrap: anywhere; user-select: all; }
+.connected-device { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 0; border-top: 1px solid #dde3d8; }
+.connected-device small { display: block; color: #52665c; }

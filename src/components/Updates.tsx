@@ -103,7 +103,7 @@ export function Updates() {
           Android will ask you to allow updates from Monty and confirm installation.
         </p>
         <a href={releasesUrl} target="_blank" rel="noreferrer">
-          View APKs on GitHub
+          Download Monty for Android
         </a>
         {message && <p role="status">{message}</p>}
         {error && <p role="alert">{error}</p>}

@@ -11,6 +11,7 @@ android {
         versionCode Integer.parseInt(project.findProperty('montyVersionCode') ?: montyVersion.versionCode.toString())
         versionName project.findProperty('montyVersionName') ?: montyVersion.versionName
         buildConfigField 'String', 'UPDATE_REPOSITORY', '"Rajneesh26D/monty-android"'
+        buildConfigField 'String', 'UPDATE_GATEWAY', '"https://monty-mobile.fuzzygenet512.chatgpt.site"'
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.

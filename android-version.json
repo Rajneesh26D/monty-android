@@ -1,5 +1,5 @@
 {
-  "versionCode": 20001,
-  "versionName": "2.0.1",
-  "notes": "Android 16 release with Settings → Updates, verified APK installation, and optional update notifications."
+  "versionCode": 20100,
+  "versionName": "2.1.0",
+  "notes": "Sync your Android and web study library through one backend. Pair once from web Settings, keep offline progress, and install or update directly on your phone without USB."
 }

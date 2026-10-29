@@ -95,6 +95,8 @@ jobs:
             gh release create "$tag" release/*.apk release/update.json release/SHA256SUMS.txt --draft --target "$GITHUB_SHA" --title "Monty $VERSION" --notes-file release/release-notes.md
           fi
           gh release edit "$tag" --draft=false --latest
+      - name: Publish the phone download and update service
+        run: node scripts/publish-mobile-release.mjs
       - name: Remove temporary signing key
         if: always()
         run: rm -f "$RUNNER_TEMP/monty-release.jks"

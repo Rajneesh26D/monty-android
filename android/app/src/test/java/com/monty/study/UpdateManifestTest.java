@@ -30,6 +30,13 @@ public class UpdateManifestTest {
         rejected(release().put("applicationId", "com.other.app"));
         rejected(release().put("schemaVersion", 2));
     }
+    @Test public void acceptsOnlyTheConfiguredDownloadService() throws Exception {
+        JSONObject json = release();
+        json.getJSONObject("packages").getJSONObject("arm64-v8a").put("url", BuildConfig.UPDATE_GATEWAY + "/downloads/2.1.0/Monty-2.1.0-arm64-v8a.apk");
+        assertTrue(parse(json, true).url.startsWith(BuildConfig.UPDATE_GATEWAY));
+        json.getJSONObject("packages").getJSONObject("arm64-v8a").put("url", BuildConfig.UPDATE_GATEWAY + "/other/app.apk");
+        rejected(json);
+    }
     @Test public void rejectsUntrustedDownloadLocations() throws Exception {
         for (String url : new String[]{
             "http://github.com/Rajneesh26D/monty-android/releases/download/v2/app.apk",

@@ -48,9 +48,10 @@ flattens nested folders without changing IDs. It also reads old backup formats.
 
 `src/storage/repository.ts` chooses platform storage. The web app uses
 IndexedDB `vocabmaster` (kept at database version 1 for older tabs), plus
-`monty-assets` for files, jobs, and clocks. Android uses native SQLite for
-main state, app-private files for legacy PDFs, IndexedDB for newer assets and
-clocks, and Android Keystore for device credentials. Backup ZIPs contain
+`monty-assets` for files, jobs, and clocks. Android preserves and migrates its prior native SQLite state once, then uses
+the same IndexedDB/merge/sync engine as the web app. Legacy app-private PDFs
+remain readable and upload during sync. Android Keystore protects device
+credentials. Backup ZIPs contain
 state, source PDFs, banks, notes, bookmarks, answers, and results. They omit
 connection credentials and pause active tests. Restore replaces the selected
 device library after user confirmation.
@@ -59,8 +60,9 @@ The hosted version additionally syncs with private Cloudflare R2 through its
 Sites Worker. Revision-based conditional saves and three-way merges protect
 independent edits and deletions; Web Locks and broadcasts coordinate tabs.
 Files up to 500 MB use resumable 8 MiB multipart uploads. Complete ZIP backups
-currently have a separate 195 MB limit. Android retains its on-device storage;
-it does not inherit the web app's browser sign-in or automatic cloud sync.
+currently have a separate 195 MB limit. Android keeps its offline cache and connects once using an owner-created
+code. It then syncs to the same R2 library through an authenticated mobile
+gateway, with revision checks and non-destructive initial merging.
 
 ## Backend and security boundary
 
@@ -87,8 +89,24 @@ is `com.monty.study`. Transfer a backup once if migration is necessary.
 `npm run android:sync` builds local frontend assets and synchronizes Capacitor
 plugins. Java 21 / Gradle / Android API 36 produce universal and arm64-v8a APKs.
 `android-version.json` controls the monotonically increasing app version.
-GitHub Actions builds signed releases; `update.json` advertises their exact
+GitHub Actions builds signed releases for GitHub and the public APK download
+service; `update.json` and `mobile-update.json` advertise their exact
 hashes, sizes, version, and package name. Native update code checks those
 fields and the installed APK signing certificate before invoking Android's
 installer. WorkManager handles optional update-only notifications. See
 `ANDROID.md` for installation, signing setup, and release instructions.
+
+## Mobile gateway and device authorization
+
+`server/devices.ts` issues ten-minute single-use connection codes, stores only
+hashes of device tokens in the existing private R2 bucket, and supports owner
+revocation. `mobile-gateway/worker/index.mjs` forwards only explicitly allowed
+study endpoints and keeps the Sites service credential server-side. The app
+uses a narrow token in Android Keystore. The gateway has a separate bucket
+for signed APKs and update metadata; it does not store the study library.
+
+`src/services/cloud.ts` selects relative web API access or authenticated native
+access. `src/storage/repository.ts` performs the one-time SQLite migration,
+tracks offline writes and file transfers, and polls for remote changes while
+visible. Native sync integration tests exercise the real repository against
+the gateway and web Worker using isolated databases and test data.

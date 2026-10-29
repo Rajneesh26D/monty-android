@@ -39,14 +39,16 @@ final class UpdateService {
             if (status != 200) {
                 c.disconnect();
                 throw new IOException(status == 404 ? "No release is published yet. Please check again later." :
-                    "Could not reach GitHub (" + status + "). Please check again later.");
+                    "Could not reach the update service (" + status + "). Please check again later.");
             }
             return c;
         }
         throw new IOException("Too many update download redirects.");
     }
     static UpdateManifest latest(Context c) throws Exception {
-        HttpURLConnection connection = connect("https://github.com/" + BuildConfig.UPDATE_REPOSITORY + "/releases/latest/download/update.json");
+        HttpURLConnection connection;
+        try { connection = connect(BuildConfig.UPDATE_GATEWAY + "/updates/latest.json"); }
+        catch (Exception unavailable) { connection = connect("https://github.com/" + BuildConfig.UPDATE_REPOSITORY + "/releases/latest/download/update.json"); }
         try (InputStream in = connection.getInputStream(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
             byte[] buffer = new byte[4096]; int n;
             while ((n = in.read(buffer)) != -1) {

@@ -51,7 +51,7 @@ public class MontyUpdaterPlugin extends Plugin {
                 java.io.File apk = UpdateService.download(getContext(), m);
                 getActivity().runOnUiThread(() -> {
                     try { UpdateService.install(getContext(), apk); call.resolve(); }
-                    catch (Exception e) { call.reject("Could not open Android's installer. Try the APK from GitHub Releases."); }
+                    catch (Exception e) { call.reject("Could not open Android's installer. Try downloading the APK from the Monty download page."); }
                     finally { installing.set(false); }
                 });
             } catch (Exception e) { installing.set(false); call.reject(message(e)); }
@@ -83,7 +83,7 @@ public class MontyUpdaterPlugin extends Plugin {
     }
     private String message(Exception e) {
         if (e instanceof java.net.UnknownHostException || e instanceof java.net.SocketTimeoutException)
-            return "Could not reach GitHub. Check your internet connection and try again.";
+            return "Could not reach the update service. Check your internet connection and try again.";
         return e.getMessage() == null ? "Could not check the update. Please try again." : e.getMessage();
     }
 }

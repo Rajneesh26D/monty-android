@@ -6,7 +6,7 @@ const mock = vi.hoisted(() => ({
   launch: vi.fn(),
 }));
 vi.mock('@capacitor/core', () => ({
-  Capacitor: { getPlatform: () => 'android' },
+  Capacitor: { getPlatform: () => 'android', isNativePlatform: () => true },
   registerPlugin: () => ({ checkForUpdate: mock.check }),
 }));
 vi.mock('@capacitor/app', () => ({

@@ -6,9 +6,11 @@ import { APIError } from './models';
 import { generalRequestSchema } from '../shared/general';
 import { generalAI } from './general';
 import { cachedAI } from './cache';
+import { authorizeDevice, deviceRoutes } from './devices';
 interface Env {
   BUCKET: R2Bucket;
   OPENROUTER_API_KEY: string;
+  MONTY_GATEWAY_ORIGIN?: string;
 }
 type Assets = Record<string, { type: string; data: string }>;
 const json = (body: unknown, status = 200, extra: Record<string, string> = {}) =>
@@ -61,6 +63,17 @@ export function createWorker(assets: Assets) {
             { error: 'Online storage is temporarily unavailable. Your phone copy is safe.' },
             503,
           );
+        if (!(await authorizeDevice(request, env.BUCKET)))
+          return json(
+            { error: 'This device connection expired or was revoked. Connect again in Settings.' },
+            401,
+          );
+        const deviceResponse = await deviceRoutes(
+          request,
+          env.BUCKET,
+          env.MONTY_GATEWAY_ORIGIN || '',
+        );
+        if (deviceResponse) return deviceResponse;
         // A single owner-private Site has one library, including access through the
         // platform's owner-authorized service token. No user-supplied object keys.
         if (path === '/api/state') {

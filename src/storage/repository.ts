@@ -1,5 +1,6 @@
 import { uploadBinary, abortBinary } from './upload';
-import { Capacitor, registerPlugin } from '@capacitor/core';
+import { Capacitor } from '@capacitor/core';
+import { SecureStore } from '../services/secure';
 import { openDB } from 'idb';
 import { Filesystem, Directory } from '@capacitor/filesystem';
 import { Share } from '@capacitor/share';
@@ -8,8 +9,9 @@ import { stateSchema } from '../../shared/state-schema';
 import { upgradeState } from '../../shared/migrate';
 import type { AttemptClock } from '../../shared/monty';
 import { mergeCloudState } from './merge';
+import { cloudEnabled, mobileCloud, mobileConnection, siteFetch } from '../services/cloud';
 const native = Capacitor.isNativePlatform();
-const hosted = import.meta.env.VITE_HOSTED === 'true';
+const hosted = cloudEnabled;
 const offline = import.meta.env.VITE_OFFLINE === 'true';
 const offlineId =
   offline && typeof document !== 'undefined'
@@ -29,12 +31,6 @@ const assets = () =>
       for (const name of ['files', 'jobs', 'timers']) db.createObjectStore(name);
     },
   });
-interface SecurePlugin {
-  get(): Promise<{ value: string | null }>;
-  set(options: { value: string }): Promise<void>;
-  remove(): Promise<void>;
-}
-const SecureStore = registerPlugin<SecurePlugin>('SecureStore');
 let connection: Promise<import('@capacitor-community/sqlite').SQLiteDBConnection> | undefined;
 async function sqlite() {
   connection ??= (async () => {
@@ -58,8 +54,47 @@ let pendingLocalWrites = 0;
 export async function loadState(): Promise<State> {
   let value: unknown;
   if (native) {
-    const r = await (await sqlite()).query('SELECT payload FROM app_state WHERE id=1');
-    value = r.values?.[0] ? JSON.parse(r.values[0].payload) : undefined;
+    const db = await browser();
+    if (!(await db.get('private', 'native-cloud-migrated'))) {
+      const r = await (await sqlite()).query('SELECT payload FROM app_state WHERE id=1');
+      const legacy = r.values?.[0]
+        ? upgradeState(stateSchema.parse(JSON.parse(r.values[0].payload)) as State)
+        : undefined;
+      const existing: State | undefined = await db.get('state', 'current');
+      const migrated =
+        legacy && existing
+          ? mergeCloudState(undefined, legacy, upgradeState(existing))
+          : legacy || (existing && upgradeState(existing)) || upgradeState(emptyState());
+      const tx = db.transaction(['state', 'private'], 'readwrite');
+      await tx.objectStore('state').put(migrated, 'current');
+      if (legacy) await tx.objectStore('private').put(legacy, 'before-native-cloud-migration');
+      const old: CloudMeta = (await tx.objectStore('private').get('cloud')) || initialMeta();
+      await tx
+        .objectStore('private')
+        .put(
+          {
+            ...old,
+            dirty: old.dirty || hasLibraryData(migrated),
+            pdfs: [
+              ...new Set([
+                ...old.pdfs,
+                ...migrated.documents.filter((d) => !d.hash.startsWith('legacy:')).map((d) => d.id),
+              ]),
+            ],
+            files: [
+              ...new Set([
+                ...(old.files || []),
+                ...Object.keys(migrated.monty?.attachments || {}),
+                ...Object.keys(migrated.monty?.banks || {}),
+              ]),
+            ],
+          },
+          'cloud',
+        );
+      await tx.objectStore('private').put(true, 'native-cloud-migrated');
+      await tx.done;
+    }
+    value = await db.get('state', 'current');
   } else value = await (await browser()).get('state', 'current');
   if (!value && offline) {
     const data = document.getElementById('monty-offline-data')?.textContent?.trim();
@@ -87,14 +122,7 @@ export function saveState(state: State, previous?: State): Promise<void> {
   const write = writes
     .catch(() => {})
     .then(async () => {
-      if (native)
-        await (
-          await sqlite()
-        ).run(
-          'INSERT INTO app_state(id,version,payload,updated_at) VALUES(1,1,?,?) ON CONFLICT(id) DO UPDATE SET version=1,payload=excluded.payload,updated_at=excluded.updated_at',
-          [snapshot, Date.now()],
-        );
-      else {
+      {
         const db = await browser();
         const tx = db.transaction(['state', 'private'], 'readwrite');
         const stored: State | undefined = await tx.objectStore('state').get('current');
@@ -127,14 +155,7 @@ function base64(bytes: Uint8Array): string {
   return btoa(binary);
 }
 export async function savePdf(id: string, bytes: Uint8Array) {
-  if (native)
-    await Filesystem.writeFile({
-      path: `pdfs/${id}.pdf`,
-      data: base64(bytes),
-      directory: Directory.Data,
-      recursive: true,
-    });
-  else {
+  {
     await (await browser()).put('pdfs', bytes, id);
     if (hosted)
       await editMeta((m) => ({
@@ -145,10 +166,22 @@ export async function savePdf(id: string, bytes: Uint8Array) {
   }
 }
 export async function readPdf(id: string): Promise<Uint8Array> {
-  if (!native) {
+  {
     let bytes = await (await browser()).get('pdfs', id);
+    if (!bytes && native) {
+      try {
+        const r = await Filesystem.readFile({ path: `pdfs/${id}.pdf`, directory: Directory.Data });
+        bytes =
+          r.data instanceof Blob
+            ? new Uint8Array(await r.data.arrayBuffer())
+            : Uint8Array.from(atob(r.data), (c) => c.charCodeAt(0));
+        await (await browser()).put('pdfs', bytes, id);
+      } catch {
+        /* It may be available from the shared online library. */
+      }
+    }
     if (!bytes && hosted) {
-      const r = await fetch('/api/pdfs/' + encodeURIComponent(id));
+      const r = await cloudFetch('pdfs/' + encodeURIComponent(id), {}, 120000);
       if (!r.ok || !r.headers.get('content-type')?.includes('application/pdf'))
         throw new Error('Could not download this PDF from your account. Try again when online.');
       bytes = new Uint8Array(await r.arrayBuffer());
@@ -157,16 +190,13 @@ export async function readPdf(id: string): Promise<Uint8Array> {
     if (!bytes) throw new Error('The original PDF is missing. Restore a complete backup.');
     return new Uint8Array(bytes);
   }
-  const r = await Filesystem.readFile({ path: `pdfs/${id}.pdf`, directory: Directory.Data });
-  if (r.data instanceof Blob) return new Uint8Array(await r.data.arrayBuffer());
-  return Uint8Array.from(atob(r.data), (c) => c.charCodeAt(0));
 }
 export async function removePdf(id: string) {
   if (native)
     await Filesystem.deleteFile({ path: `pdfs/${id}.pdf`, directory: Directory.Data }).catch(
       () => {},
     );
-  else {
+  {
     await (await browser()).delete('pdfs', id);
     if (hosted) {
       await editMeta((m) => ({
@@ -223,6 +253,19 @@ type CloudMeta = {
   fileDeletes?: string[];
 };
 const initialMeta = (): CloudMeta => ({ etag: null, dirty: false, seq: 0, pdfs: [], deleted: [] });
+function hasLibraryData(s: State) {
+  const defaults = upgradeState(emptyState()).monty!.folders;
+  return !!(
+    s.documents.length ||
+    Object.keys(s.entries).length ||
+    s.tests.length ||
+    Object.keys(s.monty?.attachments || {}).length ||
+    Object.keys(s.monty?.banks || {}).length ||
+    Object.values(s.monty?.folders || {}).some(
+      (f) => !defaults[f.id] || f.name !== defaults[f.id].name || f.pinned,
+    )
+  );
+}
 let metaWrites: Promise<unknown> = Promise.resolve();
 function editMeta(update: (m: CloudMeta) => CloudMeta): Promise<CloudMeta> {
   const next = metaWrites
@@ -258,8 +301,11 @@ async function cloudFetch(path: string, options: RequestInit = {}, timeout = 200
   const controller = new AbortController(),
     t = setTimeout(() => controller.abort(), timeout);
   try {
-    const response = await fetch('/api/' + path, { ...options, signal: controller.signal });
-    if (response.status === 401) throw new Error('Sign in again to sync.');
+    const response = await siteFetch(path, { ...options, signal: controller.signal });
+    if (response.status === 401)
+      throw new Error(
+        mobileCloud ? 'Connect this phone again in Settings.' : 'Sign in again to sync.',
+      );
     return response;
   } finally {
     clearTimeout(t);
@@ -292,6 +338,10 @@ if (channel)
       });
   };
 async function restoreCloud(local: State): Promise<State> {
+  if (mobileCloud && !(await mobileConnection())) {
+    showSync('Connect Android in Settings to sync your web library');
+    return local;
+  }
   try {
     const remote = await onlineState();
     if (remote.state) {
@@ -307,9 +357,9 @@ async function restoreCloud(local: State): Promise<State> {
       ...old,
       etag: null,
       base: undefined,
-      dirty: local.documents.length > 0 || local.tests.length > 0 || old.dirty,
+      dirty: hasLibraryData(local) || old.dirty,
     }));
-    if (local.documents.length || local.tests.length) scheduleCloud();
+    if (hasLibraryData(local)) scheduleCloud();
     else showSync('Online backup ready');
   } catch {
     showSync('Saved on phone · online backup pending');
@@ -355,6 +405,10 @@ export function syncNow(): Promise<void> {
   const perform = async () => {
     await writes;
     await metaWrites;
+    if (mobileCloud && !(await mobileConnection())) {
+      showSync('Connect Android in Settings to sync your web library');
+      return;
+    }
     const db = await browser(),
       m: CloudMeta = (await db.get('private', 'cloud')) ?? initialMeta();
     let state: State = (await db.get('state', 'current')) ?? emptyState();
@@ -378,7 +432,7 @@ export function syncNow(): Promise<void> {
     showSync('Saving online…');
     try {
       for (const id of m.pdfs) {
-        const bytes = await db.get('pdfs', id);
+        const bytes = await readPdf(id);
         if (!bytes) throw new Error('A pending PDF is missing.');
         await uploadBinary(
           'pdfs/' + encodeURIComponent(id),
@@ -507,6 +561,11 @@ if (hosted && typeof window !== 'undefined') {
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') void syncNow();
   });
+  // Both open devices receive changes without requiring navigation or a reload.
+  setInterval(() => {
+    if (navigator.onLine && document.visibilityState === 'visible') void syncNow();
+  }, 15000);
+  window.addEventListener('monty:connection', () => void syncNow());
 }
 
 const uploadCheckpoints = {

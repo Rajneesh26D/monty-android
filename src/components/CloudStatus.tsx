@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { syncStatus, syncNow } from '../storage/repository';
+import { cloudEnabled } from '../services/cloud';
 export function CloudStatus() {
   const [status, setStatus] = useState(syncStatus());
   useEffect(() => {
@@ -13,13 +14,13 @@ export function CloudStatus() {
         <span>Offline copy · saved on device</span>
       </div>
     );
-  if (import.meta.env.VITE_HOSTED !== 'true') return null;
+  if (!cloudEnabled) return null;
   return (
     <div className="cloud-status" role="status">
       <span>{status}</span>
-      {/pending/i.test(status) && (
+      {/pending|Saved online/i.test(status) && (
         <button className="text-button" onClick={() => void syncNow()}>
-          Retry sync
+          Sync now
         </button>
       )}
     </div>

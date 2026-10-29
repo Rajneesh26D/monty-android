@@ -7,6 +7,8 @@ import { exportBackup, importBackup } from '../storage/backup';
 import { exportOffline } from '../storage/offline';
 import { androidUpdates } from '../services/updates';
 import { Updates } from './Updates';
+import { cloudEnabled, mobileCloud } from '../services/cloud';
+import { CloudSettings } from './CloudSettings';
 export function Settings({
   state,
   onUpdate,
@@ -42,6 +44,7 @@ export function Settings({
         <ArrowLeft size={18} /> Back
       </button>
       <h1>Settings</h1>
+      {cloudEnabled && <CloudSettings notify={notify} />}
       {androidUpdates && <Updates />}
       <section className="panel">
         <h2>Backup & restore</h2>
@@ -67,7 +70,9 @@ export function Settings({
             if (
               file &&
               confirm(
-                'Replace this device’s library and results with this backup? Export a backup first if you want to keep them.',
+                cloudEnabled
+                  ? 'Replace your library and results with this backup? If connected, the restored library also syncs to your other devices. Export a backup first to keep the current data.'
+                  : 'Replace this device’s library and results with this backup? Export a backup first if you want to keep them.',
               )
             )
               void action(async () => {
@@ -103,12 +108,14 @@ export function Settings({
           </p>
         </section>
       )}
-      {import.meta.env.VITE_HOSTED === 'true' ? (
+      {cloudEnabled ? (
         <section className="panel">
           <h2>Online backup</h2>
           <p className="muted">
-            Your library, PDFs, bookmarks and latest results are backed up to your private account.
-            AI is connected automatically.
+            Your library, PDFs, bookmarks and latest results sync to your private account.
+            {mobileCloud
+              ? ' Connect this phone once to use the same AI service as the web app.'
+              : ' AI is connected automatically.'}
           </p>
         </section>
       ) : import.meta.env.VITE_OFFLINE === 'true' ? (
@@ -194,7 +201,7 @@ export function Settings({
       <p className="footnote">
         {import.meta.env.VITE_OFFLINE === 'true'
           ? 'Your browser stores your progress. Clearing its data removes those local changes; your downloaded snapshot stays in the HTML file.'
-          : import.meta.env.VITE_HOSTED === 'true'
+          : cloudEnabled
             ? 'Free AI has daily limits. Imports resume from the last saved word.'
             : 'Learning and quizzes stay on this device. Free AI has daily limits. See the included setup guide to deploy your backend.'}
       </p>

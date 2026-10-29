@@ -1,85 +1,102 @@
 # Monty Android
 
-Monty is an English and Maths study app. The app packages the React/TypeScript
-study interface in Capacitor 8, stores the study manifest in native SQLite,
-keeps source PDFs in app-private files, and stores attachment banks, clocks,
-and resumable import jobs in IndexedDB. Device backend tokens use Android
-Keystore encryption. No library, source PDFs, AI key, or signing key belongs
-in a public repository or release.
+Install from **https://monty-mobile.fuzzygenet512.chatgpt.site**. Download the
+ARM64 APK on a modern 64-bit Android phone, or Universal if unsure. Open the
+phone's download and approve installation. No USB connection, ADB, Android
+Studio, or laptop script is needed. Both builds target Android 16 / API 36
+and support Android 7 / API 24 onward.
 
-## Install
+## One library on the web and Android
 
-Download an APK from https://github.com/Rajneesh26D/monty-android/releases/latest.
-Use **arm64-v8a** for a modern 64-bit Android phone, or **universal** if unsure.
-Both target Android 16 / API 36 and support Android 7 / API 24 onward.
-Android may ask you to allow installation from your browser or file manager.
+1. In the existing Monty web app, open Settings → Connect Android.
+2. Create a connection code. It is valid once for ten minutes.
+3. In Android Settings → Sync with your web library, enter that code. On the
+   same phone, the web page's Connect Monty link fills it automatically.
 
-The old USB-installed Android project and signing key were not in the saved
-Sites repository. This release uses the new package `com.monty.study` and a
-stable release key. Before migrating, export a backup from the old app.
-Restore the ZIP under Settings → Backup & restore in the new app. Keep the
-old app until the restored library has been checked. If the old app has the
-same package with another key, Android cannot replace it; keep a backup
-before uninstalling it. Later releases of this app retain its package and key.
+The phone then uses the **same library, files and AI backend** as the web app.
+The existing private Sites/R2 backend remains authoritative; the mobile
+service authenticates devices and forwards requests to it. No personal study
+library is copied into the public download service or GitHub repository.
+The private Site's service credential stays server-side. Android receives an
+independent token stored with Android Keystore encryption; web Settings can
+revoke it. Tokens last up to one year and can be replaced by pairing again.
 
-The Android app opens its own on-device library. It does not automatically
-log in to the private Sites web app or sync its cloud library. ZIP backup and
-restore transfers existing study material. Existing deterministic PDF parsing,
-practice, quizzes, notes, bookmarks, and results work on the device. The
-existing vocabulary backend pairing interface is retained; general AI imports
-currently require the hosted web app. A GitHub APK release does not deploy or
-replace the private Sites backend.
+Changes save locally, sync while online, and refresh on both open devices at
+about fifteen-second intervals. Original files download on first use and
+remain cached. Previously downloaded study material works offline; offline
+changes sync on reconnection. Concurrent saves use revision checks and the
+same three-way merge as the web app. The phone preserves its previous SQLite
+manifest once, migrates into the shared sync storage path, and retains the
+original SQLite snapshot for recovery. Existing native PDF files are read
+lazily and queued for upload. Pairing an empty phone never replaces the web
+library with an empty one; existing phone-only items are merged.
+
+The original USB-installed project's package and signing key were absent from
+saved source. This release line uses `com.monty.study` and one stable signing
+key. An existing app with this package/key updates in place. If an older app
+uses another package/key, export a backup from it before migrating. Never
+uninstall an older app before retaining its phone-only material. Android
+cannot copy another package's private database automatically.
 
 ## Updates and notifications
 
-Settings → Updates shows the installed version, checks the latest public
-GitHub release, and downloads the matching APK. Before opening Android's
-installer the native updater validates metadata, exact download size, SHA-256,
-package name, higher versionCode, versionName, and the installed signing
-certificate. Failed checks delete the partial APK and leave study data alone.
-Android asks you to allow installation from Monty and confirm the update.
-An ordinary sideloaded app cannot silently install its own update.
+Settings → Updates checks the Monty download service, with GitHub Releases as
+an alternative source. Before opening Android's installer, the updater
+checks the permitted HTTPS origin, exact size, SHA-256, package, higher
+versionCode, versionName and installed signing certificate. Android requires
+you to permit installation from Monty and approve each APK update.
 
 Settings → Notifications → App updates requests notification permission and
-starts one WorkManager task with a connected-network constraint. It checks
-about every six hours, survives reboot, and sends one notification per new
-version. Tapping it opens update settings. Checks also run at launch and on
-foreground, throttled to hourly; manual checks are immediate. Notifications
-are optional and off until enabled. Android battery rules, force-stop, no
-network, and notification/channel settings can delay or suppress alerts.
-These are local release-check notifications, not a Firebase push service.
+starts a connected-network WorkManager check about every six hours. Checks
+also run when the app opens/returns to foreground. One notification is shown
+per new version; tapping opens Settings. Android battery rules, force-stop,
+network availability and notification settings affect delivery. Notifications
+are optional and disabled until enabled.
 
-## Release a change
+## Releases
 
-1. Make and review code changes.
-2. Increase **both** `versionCode` and `versionName` in `android-version.json`;
-   write the release description in `notes`.
-3. Push to `main`. The Android APK release workflow installs dependencies and
-   SDK licenses, runs checks and native tests/lint, signs both APKs, verifies
-   the signatures/alignment, and publishes APKs, checksums, and `update.json`.
-4. Existing installations see the higher version during their next check.
+Increase **both** fields in `android-version.json` and update `notes`, then
+push `main`. The workflow installs the Android SDK/licenses, runs checks,
+builds and signs ARM64 and universal APKs, verifies signatures, ZIP and 64-bit
+ELF 16 KiB alignment, and publishes complete GitHub and mobile-service releases.
+An already published version is not overwritten. The mobile service only
+switches its latest update manifest after all assets are uploaded.
 
-Rebuilding the same version uploads workflow artifacts without overwriting
-an existing release. Releases are drafted with all assets before publication,
-so the app never sees a half-uploaded update. Failed draft releases should
-be removed before retrying their version.
+### One-time Actions signing setup
 
-## Signing setup (one time)
+Actions secret `MONTY_SIGNING_KEY` holds the owner's private short unlock
+code. The repository contains only an authenticated AES-256-GCM encrypted
+backup at `.github/signing/monty-release.enc.json`. The runner decrypts the
+release key and mobile release-upload credential, masks them, and removes the
+temporary key afterward. Keep the unlock code privately; never publish it or
+an unencrypted signing key. The older `MONTY_SIGNING_BUNDLE` JSON is supported.
+A fresh key would break updates to installed releases.
 
-Repository Settings → Secrets and variables → Actions needs a secret named
-`MONTY_SIGNING_KEY`. Its value is the short private unlock code supplied to
-the owner. The repository contains an authenticated AES-256-GCM encrypted
-signing backup at `.github/signing/monty-release.enc.json`. It cannot be used
-without that code. `scripts/restore-android-signing.mjs` decrypts the existing
-release key inside the runner, masks credentials, and removes the temporary
-key after the job. Keep the unlock code privately: it is needed to recover
-the release key if the development workspace is lost. Never publish the code
-or an unencrypted signing key. Do not generate another key for an installed
-release. An existing `MONTY_SIGNING_BUNDLE` JSON secret is also supported.
+The connected GitHub app can push source and run Actions but does not have
+Secrets permission. Missing signing setup stops the workflow explicitly;
+it does not publish unsigned APKs. A local authorized release build can be
+signed with the same key and published to the mobile service independently.
 
-## Local build
+## Backend deployment
 
-Use Node 22+, Java 21, Android SDK platform 36 and build-tools 36.0.0.
+The existing private web Site serves `server/app.ts`, its original R2 library,
+and owner-only pairing/revocation endpoints. The separate `mobile-gateway/`
+Worker serves the APK landing page, downloads and narrow authenticated API
+relay. Its R2 bucket stores release APKs/metadata only. Its runtime values are:
+
+- `MONTY_UPSTREAM_ORIGIN`: the original private Monty web origin.
+- `MONTY_UPSTREAM_TOKEN`: server-only Sites service access, stored as a secret.
+- `MONTY_UPLOAD_TOKEN`: release upload authorization, stored as a secret.
+
+The original Site also has `MONTY_GATEWAY_ORIGIN`. Preserve its private
+access policy. A public mobile endpoint requires explicit owner authorization;
+only APKs are anonymous downloads. All study API requests require a paired
+device token. The relay does not forward owner device-management routes,
+arbitrary URLs, browser cookies or server credentials to the phone.
+
+## Local development
+
+Use Node 22+, Java 21, Android SDK platform 36 and build-tools 36.0.0:
 
 ```sh
 npm ci
@@ -89,14 +106,16 @@ cd android
 ./gradlew testDebugUnitTest assembleDebug
 ```
 
-For signed releases, supply `MONTY_KEYSTORE_PATH`, `MONTY_KEYSTORE_PASSWORD`,
-`MONTY_KEY_ALIAS`, and `MONTY_KEY_PASSWORD` securely in the process environment.
-Pass `-PmontyVersionCode=... -PmontyVersionName=...` matching android-version.json
-to `assembleRelease`. Then run `node scripts/package-android-release.mjs`
-from the repository root.
+For releases, supply `MONTY_KEYSTORE_PATH`, `MONTY_KEYSTORE_PASSWORD`,
+`MONTY_KEY_ALIAS`, `MONTY_KEY_PASSWORD` in the process environment, then run
+`assembleRelease`. Gradle reads `android-version.json`. From the root, run
+`node scripts/package-android-release.mjs`. `update.json` advertises GitHub
+assets; `mobile-update.json` advertises mobile-service assets. Use
+`node scripts/publish-mobile-release.mjs` with `MONTY_UPLOAD_TOKEN` to upload
+and atomically publish the latter. Never place these credentials in source.
 
-The private PDF regression fixtures are excluded from public source. Core
-and updater tests can run with:
+Private PDF regression fixtures are omitted from public source. Run public
+core and sync tests with:
 
 ```sh
 npx vitest run --exclude tests/parser.test.ts --exclude tests/monty-parser.test.ts

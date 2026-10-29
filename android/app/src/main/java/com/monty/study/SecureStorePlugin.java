@@ -13,6 +13,9 @@ import javax.crypto.spec.GCMParameterSpec;
 @CapacitorPlugin(name = "SecureStore")
 public class SecureStorePlugin extends Plugin {
     private static final String ALIAS = "monty-device-token";
+    private String entry(PluginCall call) {
+        return "cloud".equals(call.getString("key")) ? "cloud" : "token";
+    }
     private SecretKey key() throws Exception {
         KeyStore store = KeyStore.getInstance("AndroidKeyStore");
         store.load(null);
@@ -26,7 +29,7 @@ public class SecureStorePlugin extends Plugin {
     }
     @PluginMethod public void get(PluginCall call) {
         try {
-            String stored = getContext().getSharedPreferences("monty-secure", 0).getString("token", null);
+            String stored = getContext().getSharedPreferences("monty-secure", 0).getString(entry(call), null);
             JSObject result = new JSObject();
             if (stored == null) result.put("value", org.json.JSONObject.NULL);
             else {
@@ -46,12 +49,12 @@ public class SecureStorePlugin extends Plugin {
             cipher.init(Cipher.ENCRYPT_MODE, key());
             String encrypted = Base64.encodeToString(cipher.getIV(), Base64.NO_WRAP) + ":" +
                 Base64.encodeToString(cipher.doFinal(value.getBytes(java.nio.charset.StandardCharsets.UTF_8)), Base64.NO_WRAP);
-            if (!getContext().getSharedPreferences("monty-secure", 0).edit().putString("token", encrypted).commit()) throw new Exception();
+            if (!getContext().getSharedPreferences("monty-secure", 0).edit().putString(entry(call), encrypted).commit()) throw new Exception();
             call.resolve();
         } catch (Exception e) { call.reject("Could not save the device connection."); }
     }
     @PluginMethod public void remove(PluginCall call) {
-        if (getContext().getSharedPreferences("monty-secure", 0).edit().remove("token").commit()) call.resolve();
+        if (getContext().getSharedPreferences("monty-secure", 0).edit().remove(entry(call)).commit()) call.resolve();
         else call.reject("Could not remove the device connection.");
     }
 }

@@ -1,8 +1,10 @@
 import { Capacitor, registerPlugin } from '@capacitor/core';
 import { App } from '@capacitor/app';
+import { acceptPairingLink } from './cloud';
+import { MONTY_MOBILE_ORIGIN } from '../../shared/cloud';
 
 export const androidUpdates = Capacitor.getPlatform() === 'android';
-export const releasesUrl = 'https://github.com/Rajneesh26D/monty-android/releases/latest';
+export const releasesUrl = MONTY_MOBILE_ORIGIN;
 export interface UpdateStatus {
   versionCode: number;
   versionName: string;
@@ -40,7 +42,8 @@ export async function initializeUpdates(openSettings: () => void): Promise<() =>
     void updater.checkForUpdate().catch(() => {});
   };
   const open = (url?: string) => {
-    if (active && url === 'monty://settings/updates') openSettings();
+    if (active && (url === 'monty://settings/updates' || (url && acceptPairingLink(url))))
+      openSettings();
   };
   const urlListener = await App.addListener('appUrlOpen', ({ url }) => open(url));
   const stateListener = await App.addListener('appStateChange', ({ isActive }) => {

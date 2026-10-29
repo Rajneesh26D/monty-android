@@ -18,7 +18,9 @@ if (!source && process.env.MONTY_SIGNING_KEY) {
   ]).toString('utf8');
 }
 if (!source) {
-  throw new Error('One-time setup: add repository Actions secret MONTY_SIGNING_KEY using the private unlock code, then rerun this workflow.');
+  throw new Error(
+    'One-time setup: add repository Actions secret MONTY_SIGNING_KEY using the private unlock code, then rerun this workflow.',
+  );
 }
 const bundle = JSON.parse(source);
 const keyPath = join(process.env.RUNNER_TEMP, 'monty-release.jks');
@@ -28,10 +30,17 @@ const settings = {
   MONTY_KEY_ALIAS: bundle.keyAlias,
   MONTY_KEY_PASSWORD: bundle.keyPassword,
 };
+if (bundle.mobileUploadToken) settings.MONTY_UPLOAD_TOKEN = bundle.mobileUploadToken;
 for (const value of Object.values(settings)) {
-  if (typeof value !== 'string' || /[\r\n]/.test(value)) throw new Error('Invalid signing configuration');
+  if (typeof value !== 'string' || /[\r\n]/.test(value))
+    throw new Error('Invalid signing configuration');
   console.log('::add-mask::' + value);
 }
 writeFileSync(keyPath, Buffer.from(bundle.keystoreBase64, 'base64'), { mode: 0o600 });
-appendFileSync(process.env.GITHUB_ENV, Object.entries(settings).map(([name, value]) => `${name}=${value}\n`).join(''));
+appendFileSync(
+  process.env.GITHUB_ENV,
+  Object.entries(settings)
+    .map(([name, value]) => `${name}=${value}\n`)
+    .join(''),
+);
 console.log('Restored the release key into the runner temporary directory.');

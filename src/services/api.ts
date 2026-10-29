@@ -1,5 +1,6 @@
 import { aiResponseSchema, discoverySchema, type ProcessRequest } from '../../shared/validation';
 import { getToken, setToken } from '../storage/repository';
+import { mobileCloud, siteFetch } from './cloud';
 // Avoid newer AbortSignal static methods: Android 7-era WebViews only have
 // AbortController and abort events. Always release the timer and listener.
 async function request(
@@ -19,12 +20,16 @@ async function request(
     controller.abort();
   }, milliseconds);
   try {
-    const r = await fetch(url, {
+    const options: RequestInit = {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...headers },
       body: JSON.stringify(body),
       signal: controller.signal,
-    });
+    };
+    const r =
+      mobileCloud && url.startsWith('/api/')
+        ? await siteFetch(url.slice(5), options)
+        : await fetch(url, options);
     const json = await r.json();
     if (!r.ok) throw new Error(json.error || 'The service is unavailable. Retry later.');
     return json;
@@ -56,7 +61,7 @@ export async function connectBackend(address: string, code: string) {
   return url;
 }
 export async function processBatch(url: string, input: ProcessRequest, signal?: AbortSignal) {
-  if (import.meta.env.VITE_HOSTED === 'true') {
+  if (import.meta.env.VITE_HOSTED === 'true' || mobileCloud) {
     const json = await request('/api/process', input, {}, 330000, signal);
     return input.mode === 'discover' ? discoverySchema.parse(json) : aiResponseSchema.parse(json);
   }

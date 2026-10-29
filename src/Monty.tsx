@@ -24,6 +24,7 @@ import { CloudStatus } from './components/CloudStatus';
 import { Settings } from './components/Settings';
 import { removeAttachment, removePdf } from './storage/repository';
 import { initializeUpdates } from './services/updates';
+import { mobileCloud, mobileConnection } from './services/cloud';
 const labels: Record<Area, string> = {
   maths: 'Maths',
   vocab: 'Vocab',
@@ -44,6 +45,9 @@ export default function Monty() {
   useEffect(() => {
     let disposed = false;
     let cleanup: (() => void) | undefined;
+    if (mobileCloud) void mobileConnection().then(connection => {
+      if (!disposed && !connection) setSettings(true);
+    }).catch(() => {});
     void initializeUpdates(() => setSettings(true))
       .then((remove) => {
         if (disposed) remove();

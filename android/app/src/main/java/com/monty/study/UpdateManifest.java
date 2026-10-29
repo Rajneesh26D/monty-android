@@ -23,9 +23,12 @@ final class UpdateManifest {
         sha256 = apk.getString("sha256").toLowerCase(java.util.Locale.ROOT);
         size = apk.getLong("size");
         URI uri = new URI(url);
-        if (!"https".equals(uri.getScheme()) || !"github.com".equals(uri.getHost()) ||
+        URI gateway = new URI(BuildConfig.UPDATE_GATEWAY);
+        boolean trustedDownload = ("github.com".equals(uri.getHost()) && uri.getPath().startsWith("/" + repository + "/releases/download/")) ||
+            (gateway.getHost().equals(uri.getHost()) && uri.getPath().startsWith("/downloads/"));
+        if (!"https".equals(uri.getScheme()) || !trustedDownload ||
             uri.getUserInfo() != null || uri.getPort() != -1 || uri.getQuery() != null || uri.getFragment() != null ||
-            !uri.getPath().startsWith("/" + repository + "/releases/download/") || !uri.getPath().endsWith(".apk") ||
+            !uri.getPath().endsWith(".apk") ||
             !sha256.matches("[a-f0-9]{64}") || size <= 0 || size > 300L * 1024 * 1024)
             throw new IllegalArgumentException("Invalid update download.");
     }
