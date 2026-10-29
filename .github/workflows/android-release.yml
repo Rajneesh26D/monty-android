@@ -1,0 +1,103 @@
+name: Android APK release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: monty-android-release
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: android-actions/setup-android@v3
+      - name: Install Android 16 SDK and accept SDK licenses
+        run: |
+          yes | sdkmanager --licenses > /dev/null || true
+          sdkmanager 'platforms;android-36' 'build-tools;36.0.0' 'platform-tools'
+      - run: npm ci
+      - run: npm run check
+      - name: Core and updater tests (personal PDF fixtures are not published)
+        run: npx vitest run --exclude tests/parser.test.ts --exclude tests/monty-parser.test.ts
+      - run: npm run android:sync
+      - name: Restore release signing key from the repository secret
+        env:
+          MONTY_SIGNING_BUNDLE: ${{ secrets.MONTY_SIGNING_BUNDLE }}
+        run: |
+          python3 - <<'PY'
+          import base64,json,os,pathlib
+          value=os.environ.get('MONTY_SIGNING_BUNDLE','')
+          if not value:
+              raise SystemExit('Add the MONTY_SIGNING_BUNDLE repository Actions secret using the private signing setup file, then rerun this workflow.')
+          bundle=json.loads(value)
+          path=pathlib.Path(os.environ['RUNNER_TEMP'])/'monty-release.jks'
+          path.write_bytes(base64.b64decode(bundle['keystoreBase64'],validate=True))
+          path.chmod(0o600)
+          settings={'MONTY_KEYSTORE_PATH':str(path), 'MONTY_KEYSTORE_PASSWORD':bundle['storePassword'], 'MONTY_KEY_ALIAS':bundle['keyAlias'], 'MONTY_KEY_PASSWORD':bundle['keyPassword']}
+          for name,value in settings.items():
+              if '\n' in value or '\r' in value: raise SystemExit('Invalid signing configuration')
+              print('::add-mask::'+value)
+          with open(os.environ['GITHUB_ENV'],'a') as env:
+              for name,value in settings.items(): env.write(name+'='+value+'\n')
+          PY
+      - name: Read version
+        id: version
+        run: |
+          node -e 'const fs=require("fs"),v=require("./android-version.json");if(!/^\d+\.\d+\.\d+$/.test(v.versionName)||!Number.isSafeInteger(v.versionCode)||v.versionCode<=0)throw Error("Invalid version");fs.appendFileSync(process.env.GITHUB_OUTPUT,`name=${v.versionName}\ncode=${v.versionCode}\n`);'
+      - name: Native tests, Android lint, and signed APK builds
+        working-directory: android
+        run: ./gradlew testDebugUnitTest lintRelease assembleRelease --no-daemon -PmontyVersionName=${{ steps.version.outputs.name }} -PmontyVersionCode=${{ steps.version.outputs.code }}
+      - run: node scripts/package-android-release.mjs
+      - name: Verify signatures and Android 16 native library alignment
+        run: |
+          for apk in release/*.apk; do
+            "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose "$apk"
+            "$ANDROID_HOME/build-tools/36.0.0/zipalign" -c -P 16 -v 4 "$apk"
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Monty-${{ steps.version.outputs.name }}-APKs
+          path: |
+            release/*.apk
+            release/update.json
+            release/SHA256SUMS.txt
+          retention-days: 30
+      - name: Publish a complete GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.name }}
+          VERSION_CODE: ${{ steps.version.outputs.code }}
+        run: |
+          tag="v$VERSION"
+          if gh release view "$tag" > /dev/null 2>&1; then
+            echo "Release $tag already exists. APKs are available as this run's artifacts. Increase both fields in android-version.json to publish an update."
+            exit 0
+          fi
+          if gh release download --pattern update.json --dir "$RUNNER_TEMP/previous-release" > /dev/null 2>&1; then
+            python3 - <<'PY'
+          import json,os,pathlib
+          previous=json.loads((pathlib.Path(os.environ['RUNNER_TEMP'])/'previous-release/update.json').read_text())
+          if int(os.environ['VERSION_CODE']) <= previous['versionCode']: raise SystemExit('versionCode must increase for every new release.')
+          PY
+          fi
+          gh release create "$tag" release/*.apk release/update.json release/SHA256SUMS.txt --draft --target "$GITHUB_SHA" --title "Monty $VERSION" --notes-file release/release-notes.md
+          gh release edit "$tag" --draft=false --latest
+      - name: Remove temporary signing key
+        if: always()
+        run: rm -f "$RUNNER_TEMP/monty-release.jks"

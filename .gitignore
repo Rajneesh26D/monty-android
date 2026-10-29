@@ -1,0 +1,16 @@
+node_modules
+dist/
+client-dist/
+.outputs/
+.wrangler/
+.sites-runtime/
+.env*
+!.env.example
+.dev.vars*
+test-results/
+playwright-report/
+android-dist/
+release/
+*.jks
+*.keystore
+signing.properties

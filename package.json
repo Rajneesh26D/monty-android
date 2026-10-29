@@ -1,0 +1,47 @@
+{
+  "name": "monty",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "build": "tsc --noEmit && tsc --noEmit -p tsconfig.server.json && node scripts/build.mjs",
+    "test": "vitest run",
+    "preview": "vite preview --outDir client-dist --host 0.0.0.0",
+    "check": "tsc --noEmit && tsc --noEmit -p tsconfig.server.json",
+    "test:hosted": "playwright test --config playwright.hosted.config.ts",
+    "build:android:web": "tsc --noEmit && vite build --outDir android-dist",
+    "android:sync": "npm run build:android:web && cap sync android"
+  },
+  "dependencies": {
+    "@capacitor-community/sqlite": "8.1.1",
+    "@capacitor/android": "8.5.3",
+    "@capacitor/app": "^8.0.0",
+    "@capacitor/core": "8.5.3",
+    "@capacitor/filesystem": "^8.0.0",
+    "@capacitor/share": "^8.0.0",
+    "core-js": "^3.51.0",
+    "fflate": "^0.8.2",
+    "idb": "^8.0.3",
+    "lucide-react": "^0.468.0",
+    "pdfjs-dist": "^5.4.296",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "zod": "^4.1.12"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "8.5.3",
+    "@cloudflare/workers-types": "^5.20261022.1",
+    "@playwright/test": "^1.56.0",
+    "@types/node": "^24.0.0",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "@vitejs/plugin-react": "^5.0.4",
+    "prettier": "^3.9.10",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.3",
+    "vite": "^7.2.2",
+    "vitest": "^3.2.4",
+    "wrangler": "^4.45.0"
+  }
+}

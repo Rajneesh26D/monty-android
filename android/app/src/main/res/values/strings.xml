@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Monty</string>
+    <string name="title_activity_main">Monty</string>
+    <string name="package_name">com.monty.study</string>
+    <string name="custom_url_scheme">com.monty.study</string>
+</resources>
