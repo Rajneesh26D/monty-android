@@ -120,3 +120,7 @@ core and sync tests with:
 ```sh
 npx vitest run --exclude tests/parser.test.ts --exclude tests/monty-parser.test.ts
 ```
+
+## Maths layout fix in 2.1.1
+
+Both web and Android use the shared PDF layout recovery for algebraic fractions, mathematical letter encodings, grouping brackets and superscripts. Already-imported Maths questions are repaired on opening from their original PDF, without reimporting or resetting progress. A corrected local view is cached for offline study; the first recovery needs access to the original PDF. Source banks and manually edited text are preserved.

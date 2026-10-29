@@ -52,6 +52,7 @@ export const studySchema = z.object({
 export type StudyItem = z.infer<typeof studySchema>;
 export const bankSchema = z.object({
   version: z.literal(1),
+  mathLayoutVersion: z.number().int().positive().optional(),
   id: z.string(),
   kind: z.enum(['maths', 'idioms', 'general']),
   questions: z.array(mcqSchema),

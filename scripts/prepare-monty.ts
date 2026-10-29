@@ -28,6 +28,7 @@ for (const [file, kind, name, folderId] of [
         y: view.height - i.transform[5],
         width: i.width,
         height: i.height,
+        fontName: i.fontName,
       }));
     parser.add({
       number: n,

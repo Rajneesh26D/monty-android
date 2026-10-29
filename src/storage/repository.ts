@@ -51,6 +51,9 @@ async function sqlite() {
 }
 let writes: Promise<unknown> = Promise.resolve();
 let pendingLocalWrites = 0;
+export async function readStoredState(): Promise<State | undefined> {
+  return (await browser()).get('state', 'current');
+}
 export async function loadState(): Promise<State> {
   let value: unknown;
   if (native) {

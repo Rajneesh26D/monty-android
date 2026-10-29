@@ -3,21 +3,84 @@ import type { State } from '../../shared/types';
 import { uid } from '../../shared/types';
 import type { Attachment, Bank, Area, Folder, MCQ, StudyItem } from '../../shared/monty';
 import { bankSchema } from '../../shared/monty';
-import { saveAttachment, readAttachment, saveJob, readJob } from '../storage/repository';
+import {
+  saveAttachment,
+  readAttachment,
+  saveJob,
+  readJob,
+  readStoredState,
+} from '../storage/repository';
 import { openPdf } from '../pdf/reader';
 import { parsePages, type PageData } from '../pdf/parser';
 import type { Entry } from '../../shared/types';
 import { readingText } from '../pdf/readingText';
-import { MathsParser, IdiomsParser } from '../pdf/content';
+import { MathsParser, IdiomsParser, legacyMathItems, MATH_LAYOUT_VERSION } from '../pdf/content';
+import { repairMathBank } from '../core/repairMathBank';
 import { extractGeneral } from './api';
 import type { Commit, Progress } from './importer';
 import type { GeneralOutput } from '../../shared/general';
 import { mathsTests } from '../core/exams';
 const banks = new Map<string, Bank>();
+const bankLoads = new Map<string, Promise<Bank>>();
+const repairAttempts = new Map<string, number>();
 export async function readBank(id: string) {
-  if (banks.has(id)) return banks.get(id)!;
+  const cached = banks.get(id);
+  if (
+    cached &&
+    (cached.kind !== 'maths' ||
+      cached.mathLayoutVersion === MATH_LAYOUT_VERSION ||
+      Date.now() - (repairAttempts.get(id) || 0) < 60000)
+  )
+    return cached;
+  if (bankLoads.has(id)) return bankLoads.get(id)!;
+  const pending = loadBank(id).finally(() => bankLoads.delete(id));
+  bankLoads.set(id, pending);
+  return pending;
+}
+async function loadBank(id: string) {
   const file = await readAttachment(id);
-  const bank = bankSchema.parse(JSON.parse(new TextDecoder().decode(file.bytes)));
+  let bank = bankSchema.parse(JSON.parse(new TextDecoder().decode(file.bytes)));
+  if (bank.kind === 'maths' && bank.mathLayoutVersion !== MATH_LAYOUT_VERSION) {
+    repairAttempts.set(id, Date.now());
+    try {
+      const hash = Array.from(
+        new Uint8Array(await crypto.subtle.digest('SHA-256', new Uint8Array(file.bytes))),
+      )
+        .map((b) => b.toString(16).padStart(2, '0'))
+        .join('');
+      const key = `math-layout-${MATH_LAYOUT_VERSION}-${id}`;
+      const saved = await readJob<{ hash: string; bank: Bank }>(key);
+      if (saved?.hash === hash) bank = bankSchema.parse(saved.bank);
+      else {
+        const state = await readStoredState();
+        const source = Object.values(state?.monty?.attachments || {}).find(
+          (a) => a.bankId === id && a.kind === 'practice',
+        );
+        if (source) {
+          const original = await readAttachment(source.id);
+          const pdf = await openPdf(original.bytes);
+          try {
+            if (pdf.count > 500)
+              throw new Error('Original exceeds the supported repair page limit.');
+            const previous = new MathsParser(legacyMathItems),
+              corrected = new MathsParser();
+            for (let n = 1; n <= pdf.count; n++) {
+              const page = await pdf.page(n);
+              previous.add(page);
+              corrected.add(page);
+            }
+            bank = repairMathBank(bank, previous.finish(id), corrected.finish(id));
+            // This is a derived local view, not an overwrite of the shared bank.
+            await saveJob(key, { hash, bank });
+          } finally {
+            await pdf.close();
+          }
+        }
+      }
+    } catch {
+      /* Missing/offline originals must not block an existing study bank. Retry on reopening. */
+    }
+  }
   banks.set(id, bank);
   return bank;
 }
@@ -144,7 +207,7 @@ async function processPractice(
     for (let n = 1; n <= pdf.count; n++) {
       if (signal?.aborted) throw new Error('Import paused. Completed pages are saved.');
       let page = await readJob<PageData>(`page-${id}-${n}`);
-      if (!page) {
+      if (!page || page.items.some((item) => item.text.trim() && !item.fontName)) {
         page = await pdf.page(n);
         await saveJob(`page-${id}-${n}`, page);
       }

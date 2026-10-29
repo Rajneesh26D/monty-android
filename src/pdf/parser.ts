@@ -7,6 +7,7 @@ export interface TextItem {
   y: number;
   width: number;
   height: number;
+  fontName?: string;
 }
 export interface PageData {
   number: number;

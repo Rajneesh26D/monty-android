@@ -1,4 +1,4 @@
-import { englishMathText } from '../src/core/mathsText';
+import { englishMathText, flowMathText } from '../src/core/mathsText';
 import { it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
@@ -22,6 +22,7 @@ export async function pages(name: string) {
         y: v.height - i.transform[5],
         width: i.width,
         height: i.height,
+        fontName: i.fontName,
       }));
     pages.push({
       number: n,
@@ -46,6 +47,12 @@ it('extracts all 100 bilingual maths questions and their exact source answer gri
   expect(bank.questions.slice(-5).map((q) => q.answerId)).toEqual(['B', 'C', 'A', 'D', 'B']);
   expect(bank.questions.every((q) => q.options.length === 4)).toBe(true);
   expect(bank.questions[0].stem).toContain('[[frac:1/8]]');
+  const salary = bank.questions.find((q) => q.number === 57)!;
+  expect(salary.stem.match(/\[\[frac:x−y\/y\]\]/g)).toHaveLength(2);
+  expect(flowMathText(englishMathText(salary.stem))).toContain('value of ([[frac:x−y/y]] × 100)%?');
+  expect(englishMathText(salary.stem)).not.toMatch(/[\ufffd\u{1D400}-\u{1D7FF}]/u);
+  expect(salary.answerId).toBe('D');
+  expect(salary.options.map((o) => o.text)).toEqual(['20', '22', '24', '25']);
   expect(bank.questions[6].pages.length).toBeGreaterThan(1);
   expect(bank.questions.every((q) => /[\u0900-\u097f]/.test(q.stem))).toBe(true);
   expect(

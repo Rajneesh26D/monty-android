@@ -1470,6 +1470,7 @@ progress::-moz-progress-bar {
   line-height: 1.2;
   margin: 0 3px;
 }
+.math-expression { display: inline-block; white-space: nowrap; vertical-align: middle; }
 .fraction > span:first-child {
   border-bottom: 1px solid currentColor;
   padding: 0 3px 2px;

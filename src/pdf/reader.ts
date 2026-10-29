@@ -18,6 +18,7 @@ export async function openPdf(data: Uint8Array) {
           y: viewport.height - i.transform[5],
           width: i.width,
           height: i.height,
+          fontName: i.fontName,
         }));
       const operators = items.some((i) => i.text.trim()) ? null : await page.getOperatorList();
       const imageOps = [

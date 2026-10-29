@@ -2,7 +2,16 @@ import type { PageData, TextItem } from './parser';
 import { linesOf } from './parser';
 import type { Bank, MCQ, StudyItem } from '../../shared/monty';
 const clean = (s: string) => s.replace(/\s+/g, ' ').trim();
-export function mathItems(items: TextItem[]): TextItem[] {
+export const MATH_LAYOUT_VERSION = 2;
+
+// Retained only to recognize untouched text in banks imported before this fix.
+export const legacyMathItems = (items: TextItem[]) => groupMathItems(items, /^[\dxyz+−-]+$/);
+
+function groupMathItems(
+  items: TextItem[],
+  expression: RegExp,
+  correctGeometry = false,
+): TextItem[] {
   const source = items.filter((i) => i.text.trim());
   const used = new Set<number>(),
     out: TextItem[] = [];
@@ -14,7 +23,7 @@ export function mathItems(items: TextItem[]): TextItem[] {
   for (let i = 0; i < source.length; i++) {
     if (used.has(i)) continue;
     const a = source[i];
-    if (a.height < mode * 0.83 && /^[\dxyz+−-]+$/.test(a.text.trim())) {
+    if (a.height < mode * 0.83 && expression.test(a.text.trim())) {
       const j = source.findIndex(
         (b, n) =>
           n !== i &&
@@ -23,13 +32,14 @@ export function mathItems(items: TextItem[]): TextItem[] {
           b.y < a.y + a.height * 2.4 &&
           Math.abs(a.x + a.width / 2 - (b.x + b.width / 2)) < 3 &&
           Math.abs(a.height - b.height) < 1 &&
-          /^[\dxyz+−-]+$/.test(b.text.trim()),
+          expression.test(b.text.trim()),
       );
       if (j >= 0) {
         const b = source[j];
         used.add(j);
         out.push({
           ...a,
+          ...(correctGeometry ? { x: Math.min(a.x, b.x) } : {}),
           text: `[[frac:${a.text.trim()}/${b.text.trim()}]]`,
           y: (a.y + b.y) / 2 + 0.5,
           height: mode,
@@ -49,6 +59,7 @@ export function mathItems(items: TextItem[]): TextItem[] {
       if (parent && /^\d+$/.test(a.text.trim())) {
         out.push({
           ...a,
+          ...(correctGeometry ? { x: parent.x + parent.width } : {}),
           text: a.text
             .trim()
             .split('')
@@ -64,7 +75,76 @@ export function mathItems(items: TextItem[]): TextItem[] {
   }
   return out;
 }
+
+export function mathItems(items: TextItem[]): TextItem[] {
+  const doubled = /^([\u{1D400}-\u{1D7FF}])\1$/u;
+  const duplicatedFonts = new Set(
+    items
+      .filter(
+        (item) =>
+          item.fontName &&
+          doubled.test(item.text.trim()) &&
+          item.width > 0 &&
+          item.width < item.height * 0.9,
+      )
+      .map((item) => item.fontName),
+  );
+  const normalized = items.map((item) => {
+    let text = item.text;
+    // A one-glyph-wide item mapped to two identical math letters proves a
+    // broken ToUnicode map for this font. Collapse pairs, not real "xx" prose.
+    if (
+      duplicatedFonts.has(item.fontName) ||
+      (!item.fontName && doubled.test(text.trim()) && item.width < item.height * 0.9)
+    )
+      text = text.replace(/([\u{1D400}-\u{1D7FF}])\1/gu, '$1');
+    text = text.replace(/[\u{1D400}-\u{1D7FF}]/gu, (char) => char.normalize('NFKC'));
+    return { ...item, text };
+  });
+  const grouped = groupMathItems(
+    normalized.sort((a, b) => a.y - b.y || a.x - b.x),
+    /^[\dA-Za-z+−-]+$/,
+    true,
+  );
+  const replacements = grouped.map((item) => ({ ...item }));
+  // Lost round brackets in equation fonts appear as two isolated replacement
+  // glyphs at the surrounding text baseline. Recover only a bounded math group
+  // containing a geometrically reconstructed fraction; never replace prose �.
+  for (const left of replacements) {
+    if (left.text.trim() !== '\ufffd') continue;
+    const candidates = replacements
+      .filter(
+        (right) =>
+          right !== left &&
+          right.text.trim() === '\ufffd' &&
+          right.x > left.x + left.width &&
+          right.x - left.x < left.height * 30 &&
+          Math.abs(right.y - left.y) < left.height * 0.25 &&
+          Math.abs(right.height - left.height) < 1 &&
+          (!left.fontName || !right.fontName || left.fontName === right.fontName),
+      )
+      .sort((a, b) => a.x - b.x);
+    for (const right of candidates) {
+      const inner = replacements.filter(
+        (item) =>
+          item !== left &&
+          item !== right &&
+          item.text.trim() &&
+          item.x >= left.x + left.width - 0.5 &&
+          item.x + item.width <= right.x + 0.5 &&
+          Math.abs(item.y - left.y) < left.height * 0.35,
+      );
+      const text = inner.map((item) => item.text).join(' ');
+      if (!text.includes('[[frac:') || !/^[\dA-Za-z\s+−\-×÷*/=.,%()[\]:]+$/.test(text)) continue;
+      left.text = '(';
+      right.text = ')';
+      break;
+    }
+  }
+  return replacements;
+}
 export class MathsParser {
+  constructor(private readonly layout: (items: TextItem[]) => TextItem[] = mathItems) {}
   private rows: { number: number; lines: string[]; page: number; pages: number[] }[] = [];
   private keys = new Map<number, string>();
   private problems: string[] = [];
@@ -106,7 +186,7 @@ export class MathsParser {
           if (!this.keys.has(Number(m[1]))) this.keys.set(Number(m[1]), m[2]);
       }
     }
-    const items = mathItems(
+    const items = this.layout(
       page.items.filter((i) => i.y > 25 && i.y < Math.min(keyY - 3, page.height - 58)),
     );
     // Detect the actual question columns, rather than joining rows across the gutter.
@@ -193,7 +273,15 @@ export class MathsParser {
       warnings.push(
         'No readable numbered questions were found. Scanned or diagram-only questions need a text-based PDF.',
       );
-    return { version: 1, id, kind: 'maths', questions, study: [], warnings };
+    return {
+      version: 1,
+      id,
+      kind: 'maths',
+      questions,
+      study: [],
+      warnings,
+      ...(this.layout === mathItems ? { mathLayoutVersion: MATH_LAYOUT_VERSION } : {}),
+    };
   }
 }
 export class IdiomsParser {
