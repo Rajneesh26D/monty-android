@@ -67,12 +67,15 @@ be removed before retrying their version.
 ## Signing setup (one time)
 
 Repository Settings → Secrets and variables → Actions needs a secret named
-`MONTY_SIGNING_BUNDLE`. Its value is JSON with `keystoreBase64`,
-`storePassword`, `keyAlias`, and `keyPassword`. Use the private setup file
-provided with the release key; do not generate another key for an installed
-release. GitHub Actions masks the credentials, writes the key in its temporary
-directory, and removes it after the job. Keep an independent private backup.
-Never put the setup file or backup into Git, issues, release assets, or chat.
+`MONTY_SIGNING_KEY`. Its value is the short private unlock code supplied to
+the owner. The repository contains an authenticated AES-256-GCM encrypted
+signing backup at `.github/signing/monty-release.enc.json`. It cannot be used
+without that code. `scripts/restore-android-signing.mjs` decrypts the existing
+release key inside the runner, masks credentials, and removes the temporary
+key after the job. Keep the unlock code privately: it is needed to recover
+the release key if the development workspace is lost. Never publish the code
+or an unencrypted signing key. Do not generate another key for an installed
+release. An existing `MONTY_SIGNING_BUNDLE` JSON secret is also supported.
 
 ## Local build
 

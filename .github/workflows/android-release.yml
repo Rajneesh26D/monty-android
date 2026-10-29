@@ -44,23 +44,8 @@ jobs:
       - name: Restore release signing key from the repository secret
         env:
           MONTY_SIGNING_BUNDLE: ${{ secrets.MONTY_SIGNING_BUNDLE }}
-        run: |
-          python3 - <<'PY'
-          import base64,json,os,pathlib
-          value=os.environ.get('MONTY_SIGNING_BUNDLE','')
-          if not value:
-              raise SystemExit('Add the MONTY_SIGNING_BUNDLE repository Actions secret using the private signing setup file, then rerun this workflow.')
-          bundle=json.loads(value)
-          path=pathlib.Path(os.environ['RUNNER_TEMP'])/'monty-release.jks'
-          path.write_bytes(base64.b64decode(bundle['keystoreBase64'],validate=True))
-          path.chmod(0o600)
-          settings={'MONTY_KEYSTORE_PATH':str(path), 'MONTY_KEYSTORE_PASSWORD':bundle['storePassword'], 'MONTY_KEY_ALIAS':bundle['keyAlias'], 'MONTY_KEY_PASSWORD':bundle['keyPassword']}
-          for name,value in settings.items():
-              if '\n' in value or '\r' in value: raise SystemExit('Invalid signing configuration')
-              print('::add-mask::'+value)
-          with open(os.environ['GITHUB_ENV'],'a') as env:
-              for name,value in settings.items(): env.write(name+'='+value+'\n')
-          PY
+          MONTY_SIGNING_KEY: ${{ secrets.MONTY_SIGNING_KEY }}
+        run: node scripts/restore-android-signing.mjs
       - name: Read version
         id: version
         run: |
@@ -91,7 +76,8 @@ jobs:
           VERSION_CODE: ${{ steps.version.outputs.code }}
         run: |
           tag="v$VERSION"
-          if gh release view "$tag" > /dev/null 2>&1; then
+          monty_draft_state=$(gh release view "$tag" --json isDraft --jq .isDraft 2>/dev/null || echo missing)
+          if [ "$monty_draft_state" = false ]; then
             echo "Release $tag already exists. APKs are available as this run's artifacts. Increase both fields in android-version.json to publish an update."
             exit 0
           fi
@@ -102,7 +88,12 @@ jobs:
           if int(os.environ['VERSION_CODE']) <= previous['versionCode']: raise SystemExit('versionCode must increase for every new release.')
           PY
           fi
-          gh release create "$tag" release/*.apk release/update.json release/SHA256SUMS.txt --draft --target "$GITHUB_SHA" --title "Monty $VERSION" --notes-file release/release-notes.md
+          if [ "$monty_draft_state" = true ]; then
+            gh release upload "$tag" release/*.apk release/update.json release/SHA256SUMS.txt --clobber
+            gh release edit "$tag" --title "Monty $VERSION" --notes-file release/release-notes.md
+          else
+            gh release create "$tag" release/*.apk release/update.json release/SHA256SUMS.txt --draft --target "$GITHUB_SHA" --title "Monty $VERSION" --notes-file release/release-notes.md
+          fi
           gh release edit "$tag" --draft=false --latest
       - name: Remove temporary signing key
         if: always()
