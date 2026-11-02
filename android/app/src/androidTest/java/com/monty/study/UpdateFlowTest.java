@@ -2,6 +2,7 @@ package com.monty.study;
 import android.app.*;
 import android.content.*;
 import android.os.*;
+import android.view.accessibility.AccessibilityNodeInfo;
 import androidx.test.platform.app.InstrumentationRegistry;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.work.*;
@@ -50,6 +51,14 @@ public class UpdateFlowTest {
             assertTrue("Worker must post without foreground activity; allowed="+UpdateService.notificationsAllowed(c)+" notifiedVersion="+UpdateService.prefs(c).getInt("notifiedVersion",0),found);
         }finally{UpdateService.prefs(c).edit().putBoolean("notifications",false).commit();UpdateWorker.schedule(c);c.getSystemService(NotificationManager.class).cancel(2001);}
     }
+    private AccessibilityNodeInfo installButton(AccessibilityNodeInfo node){
+        if(node==null)return null;
+        String text=String.valueOf(node.getText()), pkg=String.valueOf(node.getPackageName());
+        if((pkg.contains("packageinstaller")||pkg.contains("permissioncontroller")) && node.isEnabled() && node.isClickable() &&
+            ("update".equalsIgnoreCase(text)||"install".equalsIgnoreCase(text)))return node;
+        for(int i=0;i<node.getChildCount();i++){AccessibilityNodeInfo found=installButton(node.getChild(i));if(found!=null)return found;}
+        return null;
+    }
     @Test public void openInstallerFromForegroundActivity()throws Exception {
         Context c=context();
         File directory=new File(c.getCacheDir(),"updates");assertTrue(directory.isDirectory()||directory.mkdirs());
@@ -65,11 +74,19 @@ public class UpdateFlowTest {
         assertEquals("content",installer.getData().getScheme());
         assertNotNull(installer.getClipData());
         instrumentation.runOnMainSync(()->{try{UpdateService.launchInstaller(activity,installer);}catch(Exception e){throw new RuntimeException(e);}});
-        // Finishing instrumentation tears down its activity/task. Keep it alive
-        // while the external UI driver confirms the self-update, which will
-        // intentionally terminate this process when Android replaces the APK.
-        Bundle ready=new Bundle();ready.putString("stream","\nMONTY_INSTALLER_READY\n");
+        // Use this instrumentation's accessibility connection for the real
+        // installer UI; a second shell UIAutomator connection would conflict.
+        AccessibilityNodeInfo button=null;
+        long until=SystemClock.uptimeMillis()+20000;
+        while(button==null && SystemClock.uptimeMillis()<until){
+            button=installButton(instrumentation.getUiAutomation().getRootInActiveWindow());
+            if(button==null)Thread.sleep(100);
+        }
+        assertNotNull("Monty must open Android's real Install/Update confirmation",button);
+        Bundle ready=new Bundle();ready.putString("stream","\nMONTY_INSTALLER_READY: "+button.getPackageName()+" / "+button.getText()+"\n");
         instrumentation.sendStatus(0,ready);
+        assertTrue("Android installer button must accept confirmation",button.performAction(AccessibilityNodeInfo.ACTION_CLICK));
+        // Successful replacement intentionally terminates this instrumentation.
         Thread.sleep(90000);
         fail("Android did not replace the app after opening its installer.");
     }
