@@ -87,3 +87,34 @@ it('uses page images when text is absent and keeps uncertain AI coverage visible
   expect(fixed.warnings.join(' ')).toContain('unresolved');
   expect(mocks.save).not.toHaveBeenCalled();
 });
+it('limits dense numbered pages to six target questions per request', async () => {
+  const dense = Array.from(
+    { length: 13 },
+    (_, i) => `${i + 1}. Some source question with choices?`,
+  ).join('\n');
+  const document = {
+    ...pdf,
+    page: vi.fn(async () => ({ ...page, text: dense, items: [{ ...page.items[0], text: dense }] })),
+  };
+  mocks.extract.mockImplementation(async (input) => ({
+    questions: input.targets.map((number) => ({ ...result.questions[0], number })),
+    unresolved: [],
+  }));
+  const fixed = await recoverMaths(
+    {
+      ...bank,
+      warnings: [
+        'Could not locate questions: ' +
+          Array.from({ length: 13 }, (_, i) => i + 1).join(', ') +
+          '.',
+      ],
+    },
+    [],
+    'source',
+    document,
+    () => {},
+  );
+  expect(mocks.extract.mock.calls.map((call) => call[0].targets.length)).toEqual([6, 6, 1]);
+  expect(fixed.questions).toHaveLength(13);
+  expect(fixed.warnings).toEqual([]);
+});

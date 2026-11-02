@@ -1,6 +1,7 @@
 import { z } from 'zod';
 export const mathsRequestSchema = z.object({
   area: z.literal('maths'),
+  focusPage: z.number().int().positive().optional(),
   pages: z
     .array(
       z.object({

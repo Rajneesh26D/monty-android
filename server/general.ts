@@ -33,6 +33,7 @@ export async function generalAI(
   fetcher: typeof fetch = fetch,
   inferxKey?: string,
 ) {
+  const deadline = Date.now() + 150000;
   const bytes = new TextEncoder().encode(JSON.stringify(input)),
     hash = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)))
       .map((n) => n.toString(16).padStart(2, '0'))
@@ -61,7 +62,6 @@ export async function generalAI(
     .slice(0, 10);
   if (!ranked.length)
     throw new APIError(503, 'No compatible free model is available. Import progress is saved.');
-  const deadline = Date.now() + 150000;
   let rate = false;
   for (const m of ranked) {
     if (!m || Date.now() > deadline) break;
@@ -81,7 +81,7 @@ export async function generalAI(
       const r = await fetcher('https://openrouter.ai/api/v1/chat/completions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + key },
-        signal: AbortSignal.timeout(30000),
+        signal: AbortSignal.timeout(Math.max(1, Math.min(30000, deadline - Date.now()))),
         body: JSON.stringify({
           model: m.id,
           messages: [
