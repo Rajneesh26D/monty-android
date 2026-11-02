@@ -65,5 +65,12 @@ public class UpdateFlowTest {
         assertEquals("content",installer.getData().getScheme());
         assertNotNull(installer.getClipData());
         instrumentation.runOnMainSync(()->{try{UpdateService.launchInstaller(activity,installer);}catch(Exception e){throw new RuntimeException(e);}});
+        // Finishing instrumentation tears down its activity/task. Keep it alive
+        // while the external UI driver confirms the self-update, which will
+        // intentionally terminate this process when Android replaces the APK.
+        Bundle ready=new Bundle();ready.putString("stream","\nMONTY_INSTALLER_READY\n");
+        instrumentation.sendStatus(0,ready);
+        Thread.sleep(90000);
+        fail("Android did not replace the app after opening its installer.");
     }
 }
