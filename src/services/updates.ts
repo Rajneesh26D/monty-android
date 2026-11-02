@@ -12,6 +12,10 @@ export interface UpdateStatus {
   notificationsEnabled: boolean;
   notificationsAllowed: boolean;
   lastChecked: number;
+  lastBackgroundCheck?: number;
+  backgroundRestricted?: boolean;
+  batteryOptimized?: boolean;
+  backgroundError?: string;
   installMessage?: string;
   packageName?: string;
 }
@@ -29,6 +33,7 @@ interface UpdaterPlugin {
   installLatest(): Promise<void>;
   setNotifications(options: { enabled: boolean }): Promise<{ enabled: boolean; allowed: boolean }>;
   openNotificationSettings(): Promise<void>;
+  openBackgroundSettings(): Promise<void>;
 }
 export const updater = registerPlugin<UpdaterPlugin>('MontyUpdater');
 

@@ -147,9 +147,32 @@ export function Updates() {
           </button>
         )}
         <p className="footnote">
-          Checks run when Monty opens and about every six hours while notifications are on. Battery
-          settings can delay background checks.
+          Update checks run in the background about every 15 minutes while notifications are on,
+          including after a reboot. Android may delay checks during battery saving or after a force
+          stop.
         </p>
+        {status?.lastBackgroundCheck ? (
+          <p className="footnote">
+            Last background check: {new Date(status.lastBackgroundCheck).toLocaleString()}
+          </p>
+        ) : null}
+        {status?.backgroundError && <p className="footnote">{status.backgroundError}</p>}
+        {status?.notificationsEnabled &&
+          (status.backgroundRestricted || status.batteryOptimized) && (
+            <>
+              <p className="footnote">
+                For more reliable background notifications, open Battery in Monty's Android app
+                settings and choose Unrestricted.
+              </p>
+              <button
+                className="secondary full"
+                disabled={!!busy}
+                onClick={() => void action('battery', () => updater.openBackgroundSettings())}
+              >
+                Background and battery settings
+              </button>
+            </>
+          )}
         <details
           onToggle={(event) => {
             if (event.currentTarget.open && !licenses) {

@@ -1,5 +1,5 @@
 {
-  "versionCode": 20105,
-  "versionName": "2.1.5",
-  "notes": "Improve maths imports with contents-table filtering, compound questions, decimal powers, and resumable AI recovery with source validation."
+  "versionCode": 20106,
+  "versionName": "2.1.6",
+  "notes": "Restore background update checks after reboot and upgrade, refresh the schedule to 15 minutes, and open Android installation directly from Monty with automatic permission return."
 }

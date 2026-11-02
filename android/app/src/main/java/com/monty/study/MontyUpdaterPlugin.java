@@ -1,6 +1,9 @@
 package com.monty.study;
 
 import android.Manifest;
+import android.app.ActivityManager;
+import android.os.PowerManager;
+import androidx.activity.result.ActivityResult;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Build;
@@ -19,6 +22,10 @@ public class MontyUpdaterPlugin extends Plugin {
             status.put("versionName", getContext().getPackageManager().getPackageInfo(getContext().getPackageName(), 0).versionName);
             status.put("notificationsEnabled", UpdateService.prefs(getContext()).getBoolean("notifications", false));
             status.put("notificationsAllowed", UpdateService.notificationsAllowed(getContext()));
+            status.put("lastBackgroundCheck",UpdateService.prefs(getContext()).getLong("lastBackgroundCheck",0));
+            status.put("backgroundError",UpdateService.prefs(getContext()).getString("backgroundError",""));
+            status.put("backgroundRestricted",Build.VERSION.SDK_INT>=28 && getContext().getSystemService(ActivityManager.class).isBackgroundRestricted());
+            status.put("batteryOptimized",!getContext().getSystemService(PowerManager.class).isIgnoringBatteryOptimizations(getContext().getPackageName()));
             status.put("lastChecked", UpdateService.prefs(getContext()).getLong("lastChecked", 0));
             String installMessage = UpdateService.prefs(getContext()).getString("installMessage", "");
             long fromVersion = UpdateService.prefs(getContext()).getLong("installVersion", 0);
@@ -46,16 +53,26 @@ public class MontyUpdaterPlugin extends Plugin {
     }
     @PluginMethod public void installLatest(PluginCall call) {
         if (Build.VERSION.SDK_INT >= 26 && !getContext().getPackageManager().canRequestPackageInstalls()) {
-            getActivity().startActivity(new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:" + getContext().getPackageName())));
-            call.reject("Allow Monty to install updates, then return and tap Download & install again."); return;
+            startActivityForResult(call,new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,Uri.parse("package:"+getContext().getPackageName())),"installPermissionResult");return;
         }
+        beginInstall(call);
+    }
+    @ActivityCallback private void installPermissionResult(PluginCall call,ActivityResult result){
+        if(call==null)return;
+        if(Build.VERSION.SDK_INT>=26 && !getContext().getPackageManager().canRequestPackageInstalls()) {
+            call.reject("Android did not allow installation from Monty. Allow this source to install an update.");return;
+        }
+        beginInstall(call);
+    }
+    private void beginInstall(PluginCall call){
         if (!installing.compareAndSet(false, true)) { call.reject("An update download is already running."); return; }
         getBridge().execute(() -> {
             try {
                 UpdateManifest m = UpdateService.latest(getContext());
                 java.io.File apk = UpdateService.download(getContext(), m);
+                Intent installer=UpdateService.prepareInstall(getContext(),apk);
                 getActivity().runOnUiThread(() -> {
-                    try { UpdateService.install(getContext(), apk); call.resolve(); }
+                    try { UpdateService.launchInstaller(getActivity(),installer); call.resolve(); }
                     catch (Exception e) { call.reject("Could not open Android's installer. Try downloading the APK from the Monty download page."); }
                     finally { installing.set(false); }
                 });
@@ -78,6 +95,9 @@ public class MontyUpdaterPlugin extends Plugin {
         JSObject result = new JSObject();
         result.put("enabled", enabled); result.put("allowed", UpdateService.notificationsAllowed(getContext()));
         call.resolve(result);
+    }
+    @PluginMethod public void openBackgroundSettings(PluginCall call){
+        getActivity().startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,Uri.parse("package:"+getContext().getPackageName())));call.resolve();
     }
     @PluginMethod public void openNotificationSettings(PluginCall call) {
         Intent intent = Build.VERSION.SDK_INT >= 26 ? new Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS)
