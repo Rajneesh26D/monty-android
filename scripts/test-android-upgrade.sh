@@ -12,16 +12,26 @@ adb install -r "release/Monty-${monty_version}-universal.apk"
 adb shell am instrument -w -e class 'com.monty.study.UpgradeDataTest#verify' com.monty.study.test/androidx.test.runner.AndroidJUnitRunner | tee "$RUNNER_TEMP/upgrade-verify.txt"
 grep -q 'OK (1 test)' "$RUNNER_TEMP/upgrade-verify.txt"
 echo 'Verified Android 16 update from the actual 2.1.2 APK, without uninstalling and with private app data retained.'
-# Run the real worker without launching the app and verify a posted notification.
+# Model a normally used app that has been closed, not an app never launched
+# after installation (Android intentionally suppresses stopped-app work).
+adb shell am start -W -n com.monty.study/.MainActivity
 adb shell input keyevent KEYCODE_HOME
 adb shell am instrument -w -e class 'com.monty.study.UpdateFlowTest#backgroundNotificationWithoutOpeningMonty' com.monty.study.test/androidx.test.runner.AndroidJUnitRunner | tee "$RUNNER_TEMP/background-notification.txt"
-grep -q 'OK (1 test)' "$RUNNER_TEMP/background-notification.txt"
+monty_background_result=0
+grep -q 'OK (1 test)' "$RUNNER_TEMP/background-notification.txt" || monty_background_result=1
 # Reinstall the current signed APK through the same foreground intent used by
 # Monty, and confirm the real Android UI; never uninstall or clear app data.
 adb push "release/Monty-${monty_version}-universal.apk" /data/local/tmp/monty-installer-test.apk
 adb shell appops set com.monty.study REQUEST_INSTALL_PACKAGES allow
 adb shell am instrument -w -e class 'com.monty.study.UpdateFlowTest#openInstallerFromForegroundActivity' com.monty.study.test/androidx.test.runner.AndroidJUnitRunner | tee "$RUNNER_TEMP/in-app-installer.txt"
-grep -q 'OK (1 test)' "$RUNNER_TEMP/in-app-installer.txt"
-python3 scripts/confirm-android-installer.py
+monty_installer_result=0
+if grep -q 'OK (1 test)' "$RUNNER_TEMP/in-app-installer.txt"; then
+  python3 scripts/confirm-android-installer.py || monty_installer_result=1
+else
+  monty_installer_result=1
+fi
 adb shell am instrument -w -e class 'com.monty.study.UpgradeDataTest#verify' com.monty.study.test/androidx.test.runner.AndroidJUnitRunner | tee "$RUNNER_TEMP/installer-data-verify.txt"
 grep -q 'OK (1 test)' "$RUNNER_TEMP/installer-data-verify.txt"
+
+[ "$monty_background_result" -eq 0 ]
+[ "$monty_installer_result" -eq 0 ]

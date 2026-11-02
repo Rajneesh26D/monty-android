@@ -11,6 +11,7 @@ def updated():
     return match.group(1).strip()
 
 before = updated()
+xml = ''
 for attempt in range(20):
     try:
         adb('shell', 'uiautomator', 'dump', '/sdcard/monty-installer.xml')
@@ -29,6 +30,7 @@ for attempt in range(20):
         pass
     time.sleep(1)
 else:
+    print('Last Android UI:', xml)
     raise RuntimeError('The in-app action did not display an Android Install/Update confirmation')
 
 for attempt in range(40):
@@ -37,4 +39,5 @@ for attempt in range(40):
         break
     time.sleep(1)
 else:
+    print(adb('shell', 'dumpsys', 'activity', 'top')[-5000:])
     raise RuntimeError('Android confirmation was tapped but the APK was not installed')

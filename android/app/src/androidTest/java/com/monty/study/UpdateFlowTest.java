@@ -18,6 +18,7 @@ public class UpdateFlowTest {
     @Test public void backgroundNotificationWithoutOpeningMonty()throws Exception {
         Context c=context();
         if(Build.VERSION.SDK_INT>=33)InstrumentationRegistry.getInstrumentation().getUiAutomation().grantRuntimePermission(c.getPackageName(),android.Manifest.permission.POST_NOTIFICATIONS);
+        assertTrue("Android notification permission must be granted",UpdateService.notificationsAllowed(c));
         String metadata="{\"schemaVersion\":1,\"applicationId\":\"com.monty.study\",\"versionCode\":999999,\"versionName\":\"background-test\",\"minSdk\":24,\"packages\":{\"universal\":{\"url\":\"https://github.com/Rajneesh26D/monty-android/releases/download/test/test.apk\",\"sha256\":\""+String.join("",Collections.nCopies(64,"a"))+"\",\"size\":100}}}";
         UpdateManifest release=new UpdateManifest(new JSONObject(metadata),BuildConfig.UPDATE_REPOSITORY,c.getPackageName(),false);
         Configuration configuration=new Configuration.Builder().setExecutor(new SynchronousExecutor()).setWorkerFactory(new WorkerFactory(){
@@ -40,9 +41,13 @@ public class UpdateFlowTest {
             while(UpdateService.prefs(c).getLong("lastBackgroundCheck",0)==0 && System.currentTimeMillis()<until)Thread.sleep(50);
             assertTrue(UpdateService.prefs(c).getLong("lastBackgroundCheck",0)>0);
             boolean found=false;
-            for(android.service.notification.StatusBarNotification notice:c.getSystemService(NotificationManager.class).getActiveNotifications())
-                if(notice.getId()==2001 && notice.getNotification().extras.getString(Notification.EXTRA_TITLE,"").contains("background-test"))found=true;
-            assertTrue("Worker must post the update notification without launching MainActivity",found);
+            until=System.currentTimeMillis()+10000;
+            while(!found && System.currentTimeMillis()<until){
+                for(android.service.notification.StatusBarNotification notice:c.getSystemService(NotificationManager.class).getActiveNotifications())
+                    if(notice.getId()==2001 && notice.getNotification().extras.getString(Notification.EXTRA_TITLE,"").contains("background-test"))found=true;
+                if(!found)Thread.sleep(100);
+            }
+            assertTrue("Worker must post without foreground activity; allowed="+UpdateService.notificationsAllowed(c)+" notifiedVersion="+UpdateService.prefs(c).getInt("notifiedVersion",0),found);
         }finally{UpdateService.prefs(c).edit().putBoolean("notifications",false).commit();UpdateWorker.schedule(c);c.getSystemService(NotificationManager.class).cancel(2001);}
     }
     @Test public void openInstallerFromForegroundActivity()throws Exception {
