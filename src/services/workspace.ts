@@ -14,7 +14,13 @@ import { openPdf } from '../pdf/reader';
 import { parsePages, type PageData } from '../pdf/parser';
 import type { Entry } from '../../shared/types';
 import { readingText } from '../pdf/readingText';
-import { MathsParser, IdiomsParser, legacyMathItems, MATH_LAYOUT_VERSION } from '../pdf/content';
+import {
+  MathsParser,
+  IdiomsParser,
+  legacyMathItems,
+  mathItems,
+  MATH_LAYOUT_VERSION,
+} from '../pdf/content';
 import { repairMathBank } from '../core/repairMathBank';
 import { extractGeneral } from './api';
 import type { Commit, Progress } from './importer';
@@ -62,7 +68,10 @@ async function loadBank(id: string) {
           try {
             if (pdf.count > 500)
               throw new Error('Original exceeds the supported repair page limit.');
-            const previous = new MathsParser(legacyMathItems),
+            const previous = new MathsParser(
+                (bank.mathLayoutVersion ?? 1) < 2 ? legacyMathItems : mathItems,
+                2,
+              ),
               corrected = new MathsParser();
             for (let n = 1; n <= pdf.count; n++) {
               const page = await pdf.page(n);

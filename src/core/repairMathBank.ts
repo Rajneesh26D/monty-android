@@ -8,24 +8,39 @@ const sameText = (a: string, b: string) =>
 export function repairMathBank(current: Bank, previousSource: Bank, correctedSource: Bank): Bank {
   const previous = new Map(previousSource.questions.map((q) => [q.number, q]));
   const corrected = new Map(correctedSource.questions.map((q) => [q.number, q]));
+  const existing = new Set(current.questions.map((q) => q.number));
+  // Restore only questions the old parser itself omitted. A question deliberately
+  // removed from an otherwise valid source bank must remain removed.
+  const recovered = correctedSource.questions.filter(
+    (q) => !existing.has(q.number) && !previous.has(q.number),
+  );
   return {
     ...current,
     mathLayoutVersion: MATH_LAYOUT_VERSION,
-    questions: current.questions.map((question) => {
-      const before = previous.get(question.number),
-        after = corrected.get(question.number);
-      if (!before || !after) return question;
-      return {
-        ...question,
-        stem: sameText(question.stem, before.stem) ? after.stem : question.stem,
-        options: question.options.map((option) => {
-          const old = before.options.find((o) => o.id === option.id),
-            fresh = after.options.find((o) => o.id === option.id);
-          return old && fresh && sameText(option.text, old.text)
-            ? { ...option, text: fresh.text }
-            : option;
-        }),
-      };
-    }),
+    warnings: [
+      ...new Set([
+        ...current.warnings.filter((warning) => !previousSource.warnings.includes(warning)),
+        ...correctedSource.warnings,
+      ]),
+    ],
+    questions: [
+      ...current.questions.map((question) => {
+        const before = previous.get(question.number),
+          after = corrected.get(question.number);
+        if (!before || !after) return question;
+        return {
+          ...question,
+          stem: sameText(question.stem, before.stem) ? after.stem : question.stem,
+          options: question.options.map((option) => {
+            const old = before.options.find((o) => o.id === option.id),
+              fresh = after.options.find((o) => o.id === option.id);
+            return old && fresh && sameText(option.text, old.text)
+              ? { ...option, text: fresh.text }
+              : option;
+          }),
+        };
+      }),
+      ...recovered,
+    ].sort((a, b) => a.number - b.number),
   };
 }

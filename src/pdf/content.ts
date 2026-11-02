@@ -2,7 +2,7 @@ import type { PageData, TextItem } from './parser';
 import { linesOf } from './parser';
 import type { Bank, MCQ, StudyItem } from '../../shared/monty';
 const clean = (s: string) => s.replace(/\s+/g, ' ').trim();
-export const MATH_LAYOUT_VERSION = 2;
+export const MATH_LAYOUT_VERSION = 3;
 
 // Retained only to recognize untouched text in banks imported before this fix.
 export const legacyMathItems = (items: TextItem[]) => groupMathItems(items, /^[\dxyz+−-]+$/);
@@ -144,7 +144,10 @@ export function mathItems(items: TextItem[]): TextItem[] {
   return replacements;
 }
 export class MathsParser {
-  constructor(private readonly layout: (items: TextItem[]) => TextItem[] = mathItems) {}
+  constructor(
+    private readonly layout: (items: TextItem[]) => TextItem[] = mathItems,
+    private readonly structureVersion = MATH_LAYOUT_VERSION,
+  ) {}
   private rows: { number: number; lines: string[]; page: number; pages: number[] }[] = [];
   private keys = new Map<number, string>();
   private problems: string[] = [];
@@ -186,8 +189,17 @@ export class MathsParser {
           if (!this.keys.has(Number(m[1]))) this.keys.set(Number(m[1]), m[2]);
       }
     }
+    // Footer depth varies by book. Locate contact/footer baselines rather than
+    // discarding a fixed 58-point strip that can contain the final options.
+    const footer = page.items.filter(
+      (i) => i.y > page.height * 0.9 && /\+91[\s-]*\d[\d\s-]{7,}/.test(i.text),
+    );
+    const bottom =
+      this.structureVersion < 3
+        ? page.height - 58
+        : Math.min(page.height - 25, ...footer.map((i) => i.y - 4));
     const items = this.layout(
-      page.items.filter((i) => i.y > 25 && i.y < Math.min(keyY - 3, page.height - 58)),
+      page.items.filter((i) => i.y > 25 && i.y < Math.min(keyY - 3, bottom)),
     );
     // Detect the actual question columns, rather than joining rows across the gutter.
     const headXs = items.filter((i) => /^\d{1,4}[.)]$/.test(i.text.trim())).map((i) => i.x);
@@ -201,13 +213,18 @@ export class MathsParser {
         : [items];
     for (const col of columns)
       for (const line of linesOf(col)) {
-        const head = line.match(/^(\d{1,4})[.)](?:\s+(.*)|$)/);
+        // Some PDFs place the first word directly against "100.".
+        const head = line.match(
+          this.structureVersion < 3
+            ? /^(\d{1,4})[.)](?:\s+(.*)|$)/
+            : /^(\d{1,4})[.)](?:\s+(.*)|([^\d\s].*)|$)/,
+        );
         const number = head ? Number(head[1]) : 0,
           last = this.rows.at(-1);
         if (head && (!last ? number === 1 : number === last.number + 1))
           this.rows.push({
             number,
-            lines: head[2] ? [head[2]] : [],
+            lines: head[2] || head[3] ? [head[2] || head[3]] : [],
             page: page.number,
             pages: [page.number],
           });

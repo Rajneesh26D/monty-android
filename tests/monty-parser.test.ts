@@ -1,9 +1,10 @@
+import { repairMathBank } from '../src/core/repairMathBank';
 import { englishMathText, flowMathText } from '../src/core/mathsText';
 import { it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
 import { linesOf, type PageData } from '../src/pdf/parser';
-import { MathsParser, IdiomsParser } from '../src/pdf/content';
+import { MathsParser, IdiomsParser, mathItems } from '../src/pdf/content';
 export async function pages(name: string) {
   const pdf = await getDocument({
     data: new Uint8Array(readFileSync(new URL('./fixtures/' + name, import.meta.url))),
@@ -87,4 +88,56 @@ it('processes a 60-page PDF with decorative drawings and validates every numbere
   expect(bank.warnings).toEqual([]);
   expect(bank.questions).toHaveLength(59);
   expect(bank.questions.at(-1)?.number).toBe(59);
+}, 30000);
+it('extracts all 100 CENTUARY questions, exact answer grid and cross-column fractions', async () => {
+  const all = await pages('century.pdf');
+  const parser = new MathsParser();
+  for (const p of all) parser.add(p);
+  const bank = parser.finish('century');
+  expect(bank.warnings).toEqual([]);
+  expect(bank.questions.map((q) => q.number)).toEqual(Array.from({ length: 100 }, (_, i) => i + 1));
+  const keys = [
+    'BDBBCBCACA DDB CABB DAB'.replace(/ /g, ''),
+    'CCCBADACAA DBCBDBCADB'.replace(/ /g, ''),
+    'DACBCAADDB CCB CBADBAA'.replace(/ /g, ''),
+    'BADBABABDD ADABAABBBB'.replace(/ /g, ''),
+    'CBBBBBBBDB CBABB CACAC'.replace(/ /g, ''),
+  ].join('');
+  expect(keys).toHaveLength(100);
+  expect(bank.questions.map((q) => q.answerId).join('')).toBe(keys);
+  expect(
+    bank.questions.every((q) => q.options.length === 4 && q.options.every((o) => o.text.trim())),
+  ).toBe(true);
+  expect(
+    bank.questions.every(
+      (q) => !q.stem.includes('+91') && q.options.every((o) => !o.text.includes('+91')),
+    ),
+  ).toBe(true);
+  expect(bank.questions[90].options.map((o) => o.text)).toEqual(['8', '9', '6', '12']);
+  expect(bank.questions[98].options.map((o) => o.text)).toEqual([
+    '[[frac:5/9]]',
+    '[[frac:7/11]]',
+    '[[frac:3/7]]',
+    '[[frac:4/9]]',
+  ]);
+  expect(bank.questions[99].stem).toMatch(/^A batsman scored 105 runs/);
+  expect(bank.questions[99].options.map((o) => o.text)).toEqual(['40', '45', '50', '55']);
+  expect(bank.questions[98].stem).not.toContain('batsman');
+  const old = new MathsParser(mathItems, 2);
+  for (const p of all) old.add(p);
+  const previous = old.finish('century');
+  expect(previous.questions).toHaveLength(97);
+  expect(previous.warnings).toHaveLength(3);
+  const current = structuredClone(previous);
+  current.questions[0].stem = 'My edited question';
+  const repaired = repairMathBank(current, previous, bank);
+  expect(repaired.questions).toHaveLength(100);
+  expect(repaired.warnings).toEqual([]);
+  expect(repaired.questions[0].stem).toBe('My edited question');
+  expect(repaired.questions.slice(1, 90)).toEqual(bank.questions.slice(1, 90));
+  expect(repaired.questions.slice(0, 90).map((q) => q.answerId)).toEqual(
+    current.questions.slice(0, 90).map((q) => q.answerId),
+  );
+  expect(repaired.questions.map((q) => q.id)).toEqual(bank.questions.map((q) => q.id));
+  expect(previous.questions).toHaveLength(97);
 }, 30000);

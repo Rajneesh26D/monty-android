@@ -1,5 +1,5 @@
 {
-  "versionCode": 20103,
-  "versionName": "2.1.3",
-  "notes": "Fix large-file opening with bounded transfers and reusable native caching. Improve in-place updates with Android installation sessions and explicit failure reporting."
+  "versionCode": 20104,
+  "versionName": "2.1.4",
+  "notes": "Fix maths PDF footer options and tightly spaced question numbers. Recover previously omitted questions from the original PDF while preserving saved progress."
 }
