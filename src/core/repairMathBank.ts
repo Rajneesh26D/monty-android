@@ -6,13 +6,14 @@ const sameText = (a: string, b: string) =>
 // Derive corrected text only when it still matches the previous PDF parser.
 // Keep manual edits, IDs, answer keys and all attempt/progress references intact.
 export function repairMathBank(current: Bank, previousSource: Bank, correctedSource: Bank): Bank {
-  const previous = new Map(previousSource.questions.map((q) => [q.number, q]));
-  const corrected = new Map(correctedSource.questions.map((q) => [q.number, q]));
-  const existing = new Set(current.questions.map((q) => q.number));
+  const ref = (q: Bank['questions'][number]) => `${q.number}-${q.sourcePart || ''}`;
+  const previous = new Map(previousSource.questions.map((q) => [ref(q), q]));
+  const corrected = new Map(correctedSource.questions.map((q) => [ref(q), q]));
+  const existing = new Set(current.questions.map(ref));
   // Restore only questions the old parser itself omitted. A question deliberately
   // removed from an otherwise valid source bank must remain removed.
   const recovered = correctedSource.questions.filter(
-    (q) => !existing.has(q.number) && !previous.has(q.number),
+    (q) => !existing.has(ref(q)) && !previous.has(ref(q)),
   );
   return {
     ...current,
@@ -25,8 +26,8 @@ export function repairMathBank(current: Bank, previousSource: Bank, correctedSou
     ],
     questions: [
       ...current.questions.map((question) => {
-        const before = previous.get(question.number),
-          after = corrected.get(question.number);
+        const before = previous.get(ref(question)),
+          after = corrected.get(ref(question));
         if (!before || !after) return question;
         return {
           ...question,

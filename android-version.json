@@ -1,5 +1,5 @@
 {
-  "versionCode": 20104,
-  "versionName": "2.1.4",
-  "notes": "Fix maths PDF footer options and tightly spaced question numbers. Recover previously omitted questions from the original PDF while preserving saved progress."
+  "versionCode": 20105,
+  "versionName": "2.1.5",
+  "notes": "Improve maths imports with contents-table filtering, compound questions, decimal powers, and resumable AI recovery with source validation."
 }

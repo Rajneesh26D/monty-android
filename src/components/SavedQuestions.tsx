@@ -63,7 +63,11 @@ export function SavedQuestions({
       {items.map((item) => (
         <article className="word-card" key={item.ref}>
           <div className="card-heading">
-            <span className="eyebrow">{item.q ? 'Question ' + item.q.number : 'Study card'}</span>
+            <span className="eyebrow">
+              {item.q
+                ? 'Question ' + item.q.number + (item.q.sourcePart ? ` (${item.q.sourcePart})` : '')
+                : 'Study card'}
+            </span>
             <button className="text-button" onClick={() => onRemove(item.ref)}>
               Remove bookmark
             </button>

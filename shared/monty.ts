@@ -21,6 +21,7 @@ export const mcqSchema = z
   .object({
     id: z.string(),
     number: z.number().int().positive(),
+    sourcePart: z.string().max(20).optional(),
     stem: z.string().min(1).max(18000),
     meaningHi: z.string().default(''),
     passage: z.string().default(''),

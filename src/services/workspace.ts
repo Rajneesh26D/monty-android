@@ -18,11 +18,12 @@ import {
   MathsParser,
   IdiomsParser,
   legacyMathItems,
-  mathItems,
+  mathItemsV3,
   MATH_LAYOUT_VERSION,
 } from '../pdf/content';
 import { repairMathBank } from '../core/repairMathBank';
 import { extractGeneral } from './api';
+import { recoverMaths } from './mathsRecovery';
 import type { Commit, Progress } from './importer';
 import type { GeneralOutput } from '../../shared/general';
 import { mathsTests } from '../core/exams';
@@ -69,8 +70,8 @@ async function loadBank(id: string) {
             if (pdf.count > 500)
               throw new Error('Original exceeds the supported repair page limit.');
             const previous = new MathsParser(
-                (bank.mathLayoutVersion ?? 1) < 2 ? legacyMathItems : mathItems,
-                2,
+                (bank.mathLayoutVersion ?? 1) < 2 ? legacyMathItems : mathItemsV3,
+                Math.min(bank.mathLayoutVersion ?? 2, 3),
               ),
               corrected = new MathsParser();
             for (let n = 1; n <= pdf.count; n++) {
@@ -232,8 +233,11 @@ async function processPractice(
       if (n % 3 === 0) await new Promise((r) => setTimeout(r, 0));
     }
     let bank: Bank;
-    if (folder.area === 'maths') bank = math.finish(bankId);
-    else if (folder.profile === 'idioms') {
+    if (folder.area === 'maths') {
+      bank = math.finish(bankId);
+      if (bank.warnings.length)
+        bank = await recoverMaths(bank, math.sourceAnswers(), id, pdf, progress, signal);
+    } else if (folder.profile === 'idioms') {
       bank = idioms.finish(bankId);
       if (!bank.study.length) {
         for (let n = 1; n <= pdf.count; n++)

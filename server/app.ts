@@ -1,3 +1,5 @@
+import { mathsRequestSchema } from '../shared/maths-extraction';
+import { mathsAI } from './maths';
 import { multipart } from './multipart';
 import { storeUpload } from './uploads';
 import { processSchema } from '../shared/validation';
@@ -10,6 +12,7 @@ import { authorizeDevice, deviceRoutes } from './devices';
 interface Env {
   BUCKET: R2Bucket;
   OPENROUTER_API_KEY: string;
+  INFERX_API_KEY?: string;
   MONTY_GATEWAY_ORIGIN?: string;
 }
 type Assets = Record<string, { type: string; data: string }>;
@@ -57,7 +60,11 @@ export function createWorker(assets: Assets) {
         const origin = request.headers.get('Origin');
         if (origin && origin !== url.origin) return json({ error: 'Origin not allowed' }, 403);
         if (path === '/api/health')
-          return json({ ok: true, storage: !!env.BUCKET, ai: !!env.OPENROUTER_API_KEY });
+          return json({
+            ok: true,
+            storage: !!env.BUCKET,
+            ai: !!(env.INFERX_API_KEY || env.OPENROUTER_API_KEY),
+          });
         if (!env.BUCKET)
           return json(
             { error: 'Online storage is temporarily unavailable. Your phone copy is safe.' },
@@ -192,11 +199,33 @@ export function createWorker(assets: Assets) {
         if (path === '/api/extract' && request.method === 'POST') {
           const text = await request.text();
           if (text.length > 8000000) return json({ error: 'Processing chunk too large' }, 413);
-          const parsed = generalRequestSchema.safeParse(JSON.parse(text));
+          const body = JSON.parse(text);
+          if (body.area === 'maths') {
+            const parsed = mathsRequestSchema.safeParse(body);
+            if (!parsed.success) return json({ error: 'Invalid maths source pages' }, 400);
+            return json(
+              await mathsAI(
+                parsed.data,
+                env.INFERX_API_KEY,
+                env.BUCKET,
+                fetch,
+                env.OPENROUTER_API_KEY,
+              ),
+            );
+          }
+          const parsed = generalRequestSchema.safeParse(body);
           if (!parsed.success) return json({ error: 'Invalid study pages' }, 400);
-          if (!env.OPENROUTER_API_KEY)
+          if (!env.OPENROUTER_API_KEY && !env.INFERX_API_KEY)
             return json({ error: 'AI is unavailable; your import is saved.' }, 503);
-          return json(await generalAI(parsed.data, env.OPENROUTER_API_KEY, env.BUCKET));
+          return json(
+            await generalAI(
+              parsed.data,
+              env.OPENROUTER_API_KEY,
+              env.BUCKET,
+              fetch,
+              env.INFERX_API_KEY,
+            ),
+          );
         }
         if (path === '/api/process' && request.method === 'POST') {
           if (!request.headers.get('Content-Type')?.includes('application/json'))

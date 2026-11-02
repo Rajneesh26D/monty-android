@@ -1,3 +1,4 @@
+import { inferxJSON } from './inferx';
 import { generalOutputSchema, type GeneralRequest, type GeneralOutput } from '../shared/general';
 import { freeModels, PRIORITY, APIError, parseModelJSON } from './models';
 const normalized = (s: string) => s.normalize('NFC').replace(/\s+/g, ' ').toLowerCase().trim();
@@ -30,6 +31,7 @@ export async function generalAI(
   key: string,
   bucket: R2Bucket,
   fetcher: typeof fetch = fetch,
+  inferxKey?: string,
 ) {
   const bytes = new TextEncoder().encode(JSON.stringify(input)),
     hash = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)))
@@ -38,6 +40,17 @@ export async function generalAI(
   const path = 'owner/general/v1-' + hash + '.json',
     cached = await bucket.get(path);
   if (cached) return cached.json();
+  if (inferxKey && !input.pages.some((p) => p.image)) {
+    try {
+      const result = validateGeneral(await inferxJSON(prompt, input, inferxKey, fetcher), input);
+      await bucket.put(path, JSON.stringify(result), {
+        httpMetadata: { contentType: 'application/json' },
+      });
+      return result;
+    } catch (e) {
+      if (!key) throw e;
+    }
+  }
   const catalog = await freeModels(fetcher),
     vision = input.pages.some((p) => p.image);
   const ranked = [

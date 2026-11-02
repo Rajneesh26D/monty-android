@@ -4,7 +4,7 @@ import { it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
 import { linesOf, type PageData } from '../src/pdf/parser';
-import { MathsParser, IdiomsParser, mathItems } from '../src/pdf/content';
+import { MathsParser, IdiomsParser, mathItems, mathItemsV3 } from '../src/pdf/content';
 export async function pages(name: string) {
   const pdf = await getDocument({
     data: new Uint8Array(readFileSync(new URL('./fixtures/' + name, import.meta.url))),
@@ -140,4 +140,53 @@ it('extracts all 100 CENTUARY questions, exact answer grid and cross-column frac
   );
   expect(repaired.questions.map((q) => q.id)).toEqual(bank.questions.map((q) => q.id));
   expect(previous.questions).toHaveLength(97);
+}, 30000);
+it('reads the class contents table, compound answers and exponent/fraction options correctly', async () => {
+  const all = await pages('class-all.pdf'),
+    parser = new MathsParser();
+  for (const page of all) parser.add(page);
+  const bank = parser.finish('class');
+  expect(bank.warnings).toEqual([]);
+  expect(bank.questions).toHaveLength(146);
+  expect(new Set(bank.questions.map((q) => q.number)).size).toBe(144);
+  expect(new Set(bank.questions.map((q) => q.id)).size).toBe(146);
+  expect(parser.sourceAnswers()).toHaveLength(146);
+  expect(bank.questions[0].stem).toMatch(/^A sum of money Rs.4200/);
+  expect(bank.questions.slice(0, 6).map((q) => q.answerId)).toEqual(['B', 'C', 'A', 'C', 'D', 'B']);
+  const parts = bank.questions.filter((q) => q.number === 112);
+  expect(parts.map((q) => q.sourcePart)).toEqual(['i', 'ii', 'iii']);
+  expect(parts.map((q) => q.answerId)).toEqual(['A', 'C', 'A']);
+  expect(parts.map((q) => q.options.map((o) => o.text))).toEqual([
+    ['12', '13', '14', '15'],
+    ['10', '11', '15', '14'],
+    ['24', '23', '22', '21'],
+  ]);
+  const powers = bank.questions.find((q) => q.number === 115)!;
+  expect(powers.stem).toContain('8^{5.06}');
+  expect(powers.stem).toContain('8^{−4.06}');
+  expect(powers.options.map((o) => o.text)).toEqual(['[[frac:1/2³]]', '1', '2³', '0']);
+  expect(powers.answerId).toBe('B');
+  const keyRows = [
+    'BCACDBBDBDADDADCBCAA',
+    'CCAABDDCDBDAACCBABCD',
+    'ACADCBDCBBDDABBCBBBB',
+    'AACDBAADCDACACDACABB',
+    'DBBACCBACBCCBCDABACA',
+    'ACBBDACCADD',
+    'BCBD',
+    'BCBBCDDCDAD CDBBADADC'.replace(/ /g, ''),
+    'CDAAABCC',
+  ];
+  // Independent source grid includes three answers for 112.
+  const expected = keyRows.slice(0, 6).join('') + 'ACA' + keyRows.slice(6).join('');
+  expect(expected).toHaveLength(146);
+  expect(bank.questions.map((q) => q.answerId).join('')).toBe(expected);
+  expect(bank.questions.every((q) => q.options.length === 4)).toBe(true);
+  const oldParser = new MathsParser(mathItemsV3, 3);
+  for (const p of all) oldParser.add(p);
+  const previous = oldParser.finish('class');
+  expect(previous.questions).toHaveLength(136);
+  const repaired = repairMathBank(previous, previous, bank);
+  expect(repaired.questions).toHaveLength(146);
+  expect(repaired.warnings).toEqual([]);
 }, 30000);

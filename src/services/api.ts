@@ -92,3 +92,12 @@ export async function extractGeneral(
   const { generalOutputSchema } = await import('../../shared/general');
   return generalOutputSchema.parse(json);
 }
+
+export async function extractMaths(
+  input: import('../../shared/maths-extraction').MathsRequest,
+  signal?: AbortSignal,
+) {
+  const json = await request('/api/extract', input, {}, 150000, signal);
+  const { mathsOutputSchema } = await import('../../shared/maths-extraction');
+  return mathsOutputSchema.parse(json);
+}

@@ -66,6 +66,7 @@ export function BankEditor({
             {questions.map((x, i) => (
               <option key={x.id} value={i}>
                 Question {x.number}
+                {x.sourcePart ? ` (${x.sourcePart})` : ''}
               </option>
             ))}
           </select>
@@ -161,8 +162,11 @@ export function BankEditor({
                   questions: questions.map((q) => ({ ...q, stem: q.stem.trim() })),
                   warnings: [],
                 });
-                if (new Set(next.questions.map((q) => q.number)).size !== next.questions.length)
-                  throw new Error('Question numbers must be unique.');
+                if (
+                  new Set(next.questions.map((q) => `${q.number}-${q.sourcePart || ''}`)).size !==
+                  next.questions.length
+                )
+                  throw new Error('Question numbers and parts must be unique.');
                 await onSave(next);
                 onClose();
               } catch (e) {

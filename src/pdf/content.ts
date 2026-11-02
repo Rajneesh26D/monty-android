@@ -2,7 +2,7 @@ import type { PageData, TextItem } from './parser';
 import { linesOf } from './parser';
 import type { Bank, MCQ, StudyItem } from '../../shared/monty';
 const clean = (s: string) => s.replace(/\s+/g, ' ').trim();
-export const MATH_LAYOUT_VERSION = 3;
+export const MATH_LAYOUT_VERSION = 4;
 
 // Retained only to recognize untouched text in banks imported before this fix.
 export const legacyMathItems = (items: TextItem[]) => groupMathItems(items, /^[\dxyz+−-]+$/);
@@ -76,7 +76,7 @@ function groupMathItems(
   return out;
 }
 
-export function mathItems(items: TextItem[]): TextItem[] {
+export function mathItemsV3(items: TextItem[], enhanced = false): TextItem[] {
   const doubled = /^([\u{1D400}-\u{1D7FF}])\1$/u;
   const duplicatedFonts = new Set(
     items
@@ -102,8 +102,8 @@ export function mathItems(items: TextItem[]): TextItem[] {
     return { ...item, text };
   });
   const grouped = groupMathItems(
-    normalized.sort((a, b) => a.y - b.y || a.x - b.x),
-    /^[\dA-Za-z+−-]+$/,
+    (enhanced ? attachPowers(normalized) : normalized).sort((a, b) => a.y - b.y || a.x - b.x),
+    /^[\dA-Za-z⁰¹²³⁴⁵⁶⁷⁸⁹+−^{}. -]+$/,
     true,
   );
   const replacements = grouped.map((item) => ({ ...item }));
@@ -143,6 +143,59 @@ export function mathItems(items: TextItem[]): TextItem[] {
   }
   return replacements;
 }
+// Resolve complete superscript runs before pairing fractions. This prevents a
+// stem exponent from being paired with a numerator in the following option row.
+function attachPowers(items: TextItem[]): TextItem[] {
+  const out = items.map((i) => ({ ...i })),
+    used = new Set<TextItem>();
+  for (const exp of [...out].sort((a, b) => a.x - b.x)) {
+    if (used.has(exp) || !/^[0-9.+−-]+$/.test(exp.text.trim())) continue;
+    const base = out
+      .filter(
+        (b) =>
+          b !== exp &&
+          !used.has(b) &&
+          b.height > exp.height * 1.15 &&
+          b.y - exp.y > 1 &&
+          b.y - exp.y < b.height * 0.48 &&
+          exp.x >= b.x + b.width - 1 &&
+          exp.x - b.x - b.width < 3 &&
+          /[\dA-Za-z)]$/.test(b.text.trim()),
+      )
+      .sort((a, b) => b.x + b.width - a.x - a.width)[0];
+    if (!base) continue;
+    const run = [exp];
+    let end = exp.x + exp.width;
+    for (const next of out
+      .filter(
+        (i) =>
+          i !== exp &&
+          !used.has(i) &&
+          i.x >= end - 0.1 &&
+          Math.abs(i.y - exp.y) < 0.5 &&
+          Math.abs(i.height - exp.height) < 1 &&
+          /^[0-9.+−-]+$/.test(i.text.trim()),
+      )
+      .sort((a, b) => a.x - b.x)) {
+      if (next.x - end > 2) break;
+      run.push(next);
+      end = next.x + next.width;
+    }
+    const power = run.map((i) => i.text.trim()).join('');
+    base.text += /^\d+$/.test(power)
+      ? power
+          .split('')
+          .map((c) => '⁰¹²³⁴⁵⁶⁷⁸⁹'[Number(c)])
+          .join('')
+      : `^{${power}}`;
+    base.width = end - base.x;
+    for (const i of run) used.add(i);
+  }
+  return out.filter((i) => !used.has(i));
+}
+export function mathItems(items: TextItem[]) {
+  return mathItemsV3(items, true);
+}
 export class MathsParser {
   constructor(
     private readonly layout: (items: TextItem[]) => TextItem[] = mathItems,
@@ -150,6 +203,7 @@ export class MathsParser {
   ) {}
   private rows: { number: number; lines: string[]; page: number; pages: number[] }[] = [];
   private keys = new Map<number, string>();
+  private partKeys = new Map<number, Map<string, string>>();
   private problems: string[] = [];
   add(page: PageData) {
     const marker = page.items.find((i) => /answer\s*key|उत्तर\s*कुंजी/i.test(i.text));
@@ -168,6 +222,29 @@ export class MathsParser {
             a.y - n.y < 22 &&
             Math.abs(a.x - n.x) < 5,
         );
+        if (this.structureVersion >= 4) {
+          const parts = data
+            .filter((a) => a.y - n.y > 2 && a.y - n.y < 22 && Math.abs(a.x - n.x) < 80)
+            .flatMap((a) => [...a.text.matchAll(/\b([ivx]+)\)\s*[–−-]\s*([A-H])/gi)]);
+          if (
+            parts.length > 1 &&
+            data.some(
+              (a) =>
+                a.y - n.y > 2 && a.y - n.y < 22 && a.x < n.x && /i\)\s*[–−-]\s*[A-H]/i.test(a.text),
+            ) &&
+            data.some(
+              (a) =>
+                a.y - n.y > 2 &&
+                a.y - n.y < 22 &&
+                a.x > n.x &&
+                /[ivx]+\)\s*[–−-]\s*[A-H]/i.test(a.text),
+            )
+          )
+            this.partKeys.set(
+              Number(match[1]),
+              new Map(parts.map((m) => [m[1].toLowerCase(), m[2].toUpperCase()])),
+            );
+        }
         const inline = data.filter(
           (a) =>
             /^[A-Ha-h]$/.test(a.text.trim()) &&
@@ -198,8 +275,15 @@ export class MathsParser {
       this.structureVersion < 3
         ? page.height - 58
         : Math.min(page.height - 25, ...footer.map((i) => i.y - 4));
+    const section = page.items.filter((i) =>
+      /multiple(?:\s+type|\s+choice)?\s+questions|practice\s+questions|exercises?/i.test(i.text),
+    );
+    const start =
+      this.structureVersion >= 4 && !this.rows.length && section.length
+        ? Math.max(25, ...section.map((i) => i.y))
+        : 25;
     const items = this.layout(
-      page.items.filter((i) => i.y > 25 && i.y < Math.min(keyY - 3, bottom)),
+      page.items.filter((i) => i.y > start && i.y < Math.min(keyY - 3, bottom)),
     );
     // Detect the actual question columns, rather than joining rows across the gutter.
     const headXs = items.filter((i) => /^\d{1,4}[.)]$/.test(i.text.trim())).map((i) => i.x);
@@ -234,13 +318,39 @@ export class MathsParser {
         }
       }
   }
+  sourceAnswers() {
+    return [
+      ...Array.from(this.keys, ([number, answerId]) => ({ number, part: '', answerId })),
+      ...Array.from(this.partKeys, ([number, parts]) =>
+        Array.from(parts, ([part, answerId]) => ({ number, part, answerId })),
+      ).flat(),
+    ].filter((a) => !this.partKeys.has(a.number) || a.part);
+  }
   finish(id: string): Bank {
     const questions: MCQ[] = [];
     const warnings = [...this.problems];
-    for (const row of this.rows) {
+    const expanded = this.rows.flatMap((row) => {
+      const keys = this.partKeys.get(row.number);
+      if (!keys) return [{ ...row, part: '' }];
+      const parts: (typeof row & { part: string })[] = [];
+      for (const line of row.lines) {
+        const m = line.match(/^([ivx]+)\)\s*(.*)/i);
+        if (m && keys.has(m[1].toLowerCase()))
+          parts.push({ ...row, part: m[1].toLowerCase(), lines: [m[2]] });
+        else if (parts.length) parts.at(-1)!.lines.push(line);
+      }
+      return parts.length === keys.size ? parts : [{ ...row, part: '' }];
+    });
+    for (const row of expanded) {
       const stem: string[] = [],
         options: { id: string; label: string; text: string }[] = [];
       for (const line of row.lines) {
+        if (this.structureVersion >= 4 && /^class\s*[:.-]?\s*\d+/i.test(line)) continue;
+        if (this.structureVersion >= 4 && options.length && /^\[[^\]]+\]$/.test(line)) {
+          stem.push(line);
+          continue;
+        }
+
         if (/^[a-h][).]\s*/i.test(line) && (options.length > 0 || /^[aA][).]/.test(line))) {
           const matches = [...line.matchAll(/(?:^|\s)([a-h])[).]\s*/gi)];
           for (let j = 0; j < matches.length; j++) {
@@ -255,7 +365,9 @@ export class MathsParser {
           options[options.length - 1].text = clean(options.at(-1)!.text + ' ' + line);
         else stem.push(line);
       }
-      const answer = this.keys.get(row.number);
+      const answer = row.part
+        ? this.partKeys.get(row.number)?.get(row.part)
+        : this.keys.get(row.number);
       if (
         !answer ||
         options.length < 2 ||
@@ -269,9 +381,10 @@ export class MathsParser {
         continue;
       }
       questions.push({
-        id: `${id}-q${row.number}`,
+        id: `${id}-q${row.number}${row.part ? '-' + row.part : ''}`,
+        ...(row.part ? { sourcePart: row.part } : {}),
         number: row.number,
-        stem: stem.join('\n'),
+        stem: (row.part ? `(${row.part}) ` : '') + stem.join('\n'),
         meaningHi: '',
         passage: '',
         options,
