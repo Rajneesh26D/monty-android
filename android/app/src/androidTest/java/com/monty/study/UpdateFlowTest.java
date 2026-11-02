@@ -77,8 +77,8 @@ public class UpdateFlowTest {
         // Use this instrumentation's accessibility connection for the real
         // installer UI; a second shell UIAutomator connection would conflict.
         AccessibilityNodeInfo button=null;
-        long until=SystemClock.uptimeMillis()+20000;
-        while(button==null && SystemClock.uptimeMillis()<until){
+        long until=android.os.SystemClock.uptimeMillis()+20000;
+        while(button==null && android.os.SystemClock.uptimeMillis()<until){
             button=installButton(instrumentation.getUiAutomation().getRootInActiveWindow());
             if(button==null)Thread.sleep(100);
         }
