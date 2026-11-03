@@ -7,7 +7,10 @@ export function readingText(page: PageData) {
   ).length;
   const left = items.filter((i) => i.x < middle),
     right = items.filter((i) => i.x >= middle);
-  const columns = crossing < 3 && left.length > 15 && right.length > 15;
+  const heads = items.filter((i) => /^\d+[.)]$/.test(i.text.trim()));
+  const paired =
+    heads.some((i) => i.x < page.width * 0.25) && heads.some((i) => i.x > page.width * 0.48);
+  const columns = (paired || crossing < 3) && left.length > 15 && right.length > 15;
   return columns
     ? [linesOf(left).join('\n'), linesOf(right).join('\n')].join('\n\nNEXT COLUMN\n\n')
     : page.text;

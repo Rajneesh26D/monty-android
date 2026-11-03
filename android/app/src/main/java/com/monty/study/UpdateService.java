@@ -90,7 +90,9 @@ final class UpdateService {
             prefs(c).edit().putInt("notifiedVersion", m.versionCode).apply();
         } catch (SecurityException ignored) { /* The user can revoke notification permission at any time. */ }
     }
-    static File download(Context c, UpdateManifest m) throws Exception {
+    interface DownloadProgress {void bytes(long count,long total)throws IOException;}
+    static File download(Context c,UpdateManifest m)throws Exception{return download(c,m,(count,total)->{});}
+    static File download(Context c, UpdateManifest m,DownloadProgress progress) throws Exception {
         if (m.versionCode <= installedCode(c)) throw new IOException("Monty is already up to date.");
         if (m.minSdk > Build.VERSION.SDK_INT) throw new IOException("This update needs a newer Android version.");
         File directory = new File(c.getCacheDir(), "updates");
@@ -101,7 +103,7 @@ final class UpdateService {
             try (InputStream in = new FileInputStream(file)) {
                 MessageDigest cached = MessageDigest.getInstance("SHA-256"); byte[] buffer = new byte[65536]; int n;
                 while ((n = in.read(buffer)) != -1) cached.update(buffer, 0, n);
-                if (hex(cached.digest()).equals(m.sha256)) { verifyPackage(c, file, m); return file; }
+                if (hex(cached.digest()).equals(m.sha256)) { verifyPackage(c, file, m); progress.bytes(m.size,m.size);return file; }
             }
         }
         if (file.exists() && !file.delete()) throw new IOException("Could not replace the previous update download.");
@@ -115,7 +117,7 @@ final class UpdateService {
                 while ((n = in.read(buffer)) != -1) {
                     size += n;
                     if (size > m.size) throw new IOException("The APK size does not match the release.");
-                    digest.update(buffer, 0, n); out.write(buffer, 0, n);
+                    digest.update(buffer, 0, n); out.write(buffer, 0, n); progress.bytes(size,m.size);
                 }
             }
             if (size != m.size || !hex(digest.digest()).equals(m.sha256)) throw new IOException("Update verification failed. Please download again.");
@@ -140,7 +142,7 @@ final class UpdateService {
         for (Signature signature : signatures) hashes.add(hex(MessageDigest.getInstance("SHA-256").digest(signature.toByteArray())));
         return hashes;
     }
-    private static void verifyPackage(Context c, File file, UpdateManifest m) throws Exception {
+    static void verifyPackage(Context c, File file, UpdateManifest m) throws Exception {
         int flag = Build.VERSION.SDK_INT >= 28 ? PackageManager.GET_SIGNING_CERTIFICATES : PackageManager.GET_SIGNATURES;
         PackageInfo apk = c.getPackageManager().getPackageArchiveInfo(file.getAbsolutePath(), flag);
         if (apk == null || !c.getPackageName().equals(apk.packageName)) throw new IOException("The downloaded APK is not Monty.");

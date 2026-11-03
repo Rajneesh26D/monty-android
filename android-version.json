@@ -1,5 +1,5 @@
 {
-  "versionCode": 20106,
-  "versionName": "2.1.6",
-  "notes": "Restore background update checks after reboot and upgrade, refresh the schedule to 15 minutes, and open Android installation directly from Monty with automatic permission return."
+  "versionCode": 20107,
+  "versionName": "2.1.7",
+  "notes": "Extract numbered and inline English MCQs locally; recover only missing questions across subjects, retain partial quizzes, report provider limits accurately, and use a native update screen with download progress and installer retry."
 }

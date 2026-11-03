@@ -107,3 +107,80 @@ it('falls back from InferX capacity limits to a zero-price provider and validate
   ).toHaveLength(1);
   expect(fetcher).not.toHaveBeenCalled();
 });
+it('keeps valid questions when one model response contains a bad choice and recovers only that missing question', async () => {
+  const { validatePartialQuestions } = await import('../server/maths');
+  const next = {
+    ...input,
+    pages: [
+      {
+        number: 2,
+        text: input.pages[0].text + '\n2. What is the sum of three and three? a) 4 b) 5 c) 6 d) 7',
+      },
+    ],
+    targets: [1, 2],
+    answers: [...input.answers, { number: 2, part: '', answerId: 'C' as const }],
+  };
+  const bad = {
+    ...question,
+    number: 2,
+    stem: 'What is the sum of three and three?',
+    evidence: 'What is the sum of three and three?',
+    answerId: 'C',
+    options: ['4', '5', 'invented', '7'],
+  };
+  const partial = validatePartialQuestions({ questions: [question, bad] }, next);
+  expect(partial.questions.map((q) => q.number)).toEqual([1]);
+  expect(partial.unresolved).toEqual([2]);
+});
+it('tries DeepSeek text extraction even when an optional page image is present', async () => {
+  vi.resetModules();
+  const { mathsAI } = await import('../server/maths');
+  const bucket = { get: vi.fn().mockResolvedValue(null), put: vi.fn() } as any;
+  const fetcher = vi
+    .fn()
+    .mockResolvedValue(
+      Response.json({
+        choices: [
+          {
+            finish_reason: 'stop',
+            message: { content: JSON.stringify({ questions: [question] }) },
+          },
+        ],
+      }),
+    );
+  const result = await mathsAI(
+    { ...input, pages: [{ ...input.pages[0], image: 'data:image/jpeg;base64,AAAA' }] },
+    'test-secret',
+    bucket,
+    fetcher,
+  );
+  expect(result.questions).toHaveLength(1);
+  expect(fetcher.mock.calls[0][0]).toContain('inferx');
+  expect(fetcher.mock.calls[0][1].body).not.toContain('data:image');
+});
+it('does not stop after three capacity-limited free models', async () => {
+  vi.resetModules();
+  const { mathsAI } = await import('../server/maths');
+  const bucket = { get: vi.fn().mockResolvedValue(null), put: vi.fn() } as any;
+  let attempts = 0;
+  const fetcher = vi.fn(async (url: string) => {
+    if (url.endsWith('/models'))
+      return Response.json({
+        data: Array.from({ length: 4 }, (_, i) => ({
+          id: `provider${i}:free`,
+          pricing: { prompt: '0', completion: '0' },
+        })),
+      });
+    attempts++;
+    if (attempts < 4) return new Response('at capacity', { status: 429 });
+    return Response.json({
+      choices: [
+        { finish_reason: 'stop', message: { content: JSON.stringify({ questions: [question] }) } },
+      ],
+    });
+  }) as any;
+  expect((await mathsAI(input, undefined, bucket, fetcher, 'test-router')).questions).toHaveLength(
+    1,
+  );
+  expect(attempts).toBe(4);
+});

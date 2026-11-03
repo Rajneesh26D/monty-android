@@ -17,6 +17,7 @@ export interface UpdateStatus {
   batteryOptimized?: boolean;
   backgroundError?: string;
   installMessage?: string;
+  updateStage?: string;
   packageName?: string;
 }
 export interface UpdateResult {

@@ -128,7 +128,7 @@ export async function generalAI(
   throw new APIError(
     rate ? 429 : 503,
     rate
-      ? 'Free providers are temporarily busy. Your PDF and completed pages are saved; retry shortly.'
+      ? 'Study-card extraction did not finish. OpenRouter reported rate limits; your PDF and completed pages are saved.'
       : 'Free models could not return valid source-based content. Your PDF and completed pages are saved; retry missing pages.',
     rate ? 60 : undefined,
   );

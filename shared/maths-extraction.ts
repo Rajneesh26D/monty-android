@@ -1,6 +1,11 @@
 import { z } from 'zod';
 export const mathsRequestSchema = z.object({
-  area: z.literal('maths'),
+  area: z.enum(['maths', 'grammar', 'reading', 'vocab']),
+  task: z.literal('recover-questions').optional(),
+  exclude: z
+    .array(z.object({ number: z.number().int().positive(), part: z.string().max(20) }))
+    .max(2000)
+    .optional(),
   focusPage: z.number().int().positive().optional(),
   pages: z
     .array(
@@ -34,6 +39,7 @@ export const mathsOutputSchema = z.object({
         number: z.number().int().positive(),
         part: z.string().max(20).default(''),
         stem: z.string().min(5).max(18000),
+        passage: z.string().max(18000).default(''),
         options: z.array(z.string().min(1).max(4000)).min(2).max(8),
         answerId: z.enum(['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']),
         page: z.number().int().positive(),
@@ -44,6 +50,24 @@ export const mathsOutputSchema = z.object({
     )
     .max(80),
   unresolved: z.array(z.number().int().positive()).default([]),
+  diagnostics: z
+    .array(
+      z.object({
+        provider: z.string(),
+        outcome: z.enum([
+          'capacity',
+          'timeout',
+          'authentication',
+          'quota',
+          'invalid-output',
+          'unavailable',
+          'success',
+          'partial',
+        ]),
+        status: z.number().optional(),
+      }),
+    )
+    .default([]),
 });
 export type MathsRequest = z.infer<typeof mathsRequestSchema>;
 export type MathsOutput = z.infer<typeof mathsOutputSchema>;

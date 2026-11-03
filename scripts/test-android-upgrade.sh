@@ -19,12 +19,12 @@ adb shell input keyevent KEYCODE_HOME
 adb shell am instrument -w -e class 'com.monty.study.UpdateFlowTest#backgroundNotificationWithoutOpeningMonty' com.monty.study.test/androidx.test.runner.AndroidJUnitRunner | tee "$RUNNER_TEMP/background-notification.txt"
 monty_background_result=0
 grep -q 'OK (1 test)' "$RUNNER_TEMP/background-notification.txt" || monty_background_result=1
-# Reinstall the current signed APK through the same foreground intent used by
-# Monty, and confirm the real Android UI; never uninstall or clear app data.
-adb push "release/Monty-${monty_version}-universal.apk" /data/local/tmp/monty-installer-test.apk
-adb shell appops set com.monty.study REQUEST_INSTALL_PACKAGES allow
+# Exercise the actual JavaScript bridge, native update activity, verification
+# and higher-version Android confirmation; never uninstall or clear app data.
+adb push "$RUNNER_TEMP/monty-next.apk" /data/local/tmp/monty-installer-test.apk
+adb shell appops set com.monty.study REQUEST_INSTALL_PACKAGES deny
 adb shell dumpsys package com.monty.study > "$RUNNER_TEMP/installer-before.txt"
-adb shell am instrument -w -e class 'com.monty.study.UpdateFlowTest#openInstallerFromForegroundActivity' com.monty.study.test/androidx.test.runner.AndroidJUnitRunner > "$RUNNER_TEMP/in-app-installer.txt" 2>&1 &
+adb shell am instrument -w -e nextCode "$MONTY_TEST_NEXT_CODE" -e nextName "$MONTY_TEST_NEXT_NAME" -e class 'com.monty.study.UpdateFlowTest#openInstallerFromForegroundActivity' com.monty.study.test/androidx.test.runner.AndroidJUnitRunner > "$RUNNER_TEMP/in-app-installer.txt" 2>&1 &
 monty_installer_pid=$!
 monty_installer_result=0
 if ! python3 scripts/confirm-android-installer.py "$RUNNER_TEMP/installer-before.txt"; then

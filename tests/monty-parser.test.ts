@@ -190,3 +190,25 @@ it('reads the class contents table, compound answers and exponent/fraction optio
   expect(repaired.questions).toHaveLength(146);
   expect(repaired.warnings).toEqual([]);
 }, 30000);
+it('extracts the entire basics practice sheet locally, including inline choices and all sixty source answers', async () => {
+  const { QuestionParser } = await import('../src/pdf/questions');
+  const parser = new QuestionParser();
+  for (const page of await pages('basics-practice.pdf')) parser.add(page);
+  const bank = parser.finish('basics');
+  expect(bank.warnings).toEqual([]);
+  expect(bank.questions).toHaveLength(60);
+  expect(bank.questions.map((q) => q.number)).toEqual(Array.from({ length: 60 }, (_, i) => i + 1));
+  expect(bank.questions.map((q) => q.answerId).join('')).toBe(
+    'ACDDBABADCDDDBA' + 'ADCDBCCAABCCBDD' + 'CBDCBBCBBCABCCC' + 'BBAACCBACCCCBCC',
+  );
+  expect(bank.questions.reduce((count, q) => count + q.options.length, 0)).toBe(225);
+  expect(bank.questions[7].options.map((o) => o.text)).toEqual([
+    'Adverb',
+    'Verb',
+    'Adjective',
+    'Conjunction',
+  ]);
+  expect(bank.questions[45].options.map((o) => o.text)).toEqual(['quick', 'quickly', 'quickness']);
+  expect(bank.questions[53].stem).toContain('support for their team.');
+  expect(bank.questions.every((q) => q.origin === 'pdf' && q.answerOrigin === 'pdf')).toBe(true);
+}, 30000);

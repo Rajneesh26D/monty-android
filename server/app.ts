@@ -200,7 +200,7 @@ export function createWorker(assets: Assets) {
           const text = await request.text();
           if (text.length > 8000000) return json({ error: 'Processing chunk too large' }, 413);
           const body = JSON.parse(text);
-          if (body.area === 'maths') {
+          if (body.area === 'maths' || body.task === 'recover-questions') {
             const parsed = mathsRequestSchema.safeParse(body);
             if (!parsed.success) return json({ error: 'Invalid maths source pages' }, 400);
             return json(
@@ -251,7 +251,7 @@ export function createWorker(assets: Assets) {
       } catch (error) {
         if (error instanceof APIError)
           return json(
-            { error: error.message, retryAfter: error.retryAfter },
+            { error: error.message, retryAfter: error.retryAfter, diagnostics: error.diagnostics },
             error.status,
             error.retryAfter ? { 'Retry-After': String(error.retryAfter) } : {},
           );

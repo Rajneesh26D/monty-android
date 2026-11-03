@@ -80,17 +80,17 @@ export function Updates() {
                 disabled={!!busy}
                 onClick={() =>
                   void action('install', async () => {
-                    setMessage('Downloading and verifying the APK. Keep Monty open…');
+                    setMessage('Opening Monty’s update screen…');
                     await updater.installLatest();
                     setMessage(
-                      'Confirm the update in Android’s installer. Your study data stays on this device.',
+                      'The update screen shows download progress and opens Android’s confirmation.',
                     );
                   })
                 }
               >
                 <Download size={18} />{' '}
                 {busy === 'install'
-                  ? 'Downloading & verifying…'
+                  ? 'Opening update screen…'
                   : `Download & install · ${(release.size / 1024 / 1024).toFixed(1)} MB`}
               </button>
             )}

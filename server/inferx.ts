@@ -5,11 +5,12 @@ export async function inferxJSON(
   input: unknown,
   key: string,
   fetcher: typeof fetch = fetch,
+  milliseconds = 90000,
 ) {
   const response = await fetcher('https://model.inferx.net/endpoints/v1/chat/completions', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + key },
-    signal: AbortSignal.timeout(90000),
+    signal: AbortSignal.timeout(milliseconds),
     body: JSON.stringify({
       model: 'deepseek-v4.1-flash-1017-basic',
       messages: [
@@ -21,7 +22,7 @@ export async function inferxJSON(
   });
   if (!response.ok)
     throw new APIError(
-      response.status === 429 ? 429 : 503,
+      [401, 403, 429].includes(response.status) ? response.status : 503,
       response.status === 429
         ? 'The AI provider is busy. Completed chunks are saved; retry shortly.'
         : 'The AI provider could not process this chunk. Your PDF is saved.',

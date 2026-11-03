@@ -21,6 +21,7 @@ import {
   mathItemsV3,
   MATH_LAYOUT_VERSION,
 } from '../pdf/content';
+import { QuestionParser } from '../pdf/questions';
 import { repairMathBank } from '../core/repairMathBank';
 import { extractGeneral } from './api';
 import { recoverMaths } from './mathsRecovery';
@@ -209,6 +210,7 @@ async function processPractice(
     const file = await readAttachment(id);
     pdf = await openPdf(file.bytes);
     if (pdf.count > 500) throw new Error('Split PDFs longer than 500 pages.');
+    const sourceQuestions = new QuestionParser();
     const math = new MathsParser(),
       idioms = new IdiomsParser();
     const bankId = attachment.bankId ?? 'bank-' + id;
@@ -221,6 +223,7 @@ async function processPractice(
         page = await pdf.page(n);
         await saveJob(`page-${id}-${n}`, page);
       }
+      if (folder.profile !== 'idioms') sourceQuestions.add(page);
       if (folder.area === 'maths') math.add(page);
       else if (folder.profile === 'idioms') idioms.add(page);
       else {
@@ -234,9 +237,29 @@ async function processPractice(
     }
     let bank: Bank;
     if (folder.area === 'maths') {
-      bank = math.finish(bankId);
+      const normal = math.finish(bankId),
+        generic = sourceQuestions.finish(bankId);
+      const useGeneric = generic.questions.length > normal.questions.length;
+      bank = useGeneric
+        ? { ...generic, kind: 'maths', mathLayoutVersion: MATH_LAYOUT_VERSION }
+        : normal;
       if (bank.warnings.length)
-        bank = await recoverMaths(bank, math.sourceAnswers(), id, pdf, progress, signal);
+        bank = await recoverMaths(
+          bank,
+          useGeneric ? sourceQuestions.sourceAnswers() : math.sourceAnswers(),
+          id,
+          pdf,
+          progress,
+          signal,
+          {
+            fragments: useGeneric ? sourceQuestions.recoveryFragments() : undefined,
+            area: folder.area,
+            onCheckpoint: async (partial) => {
+              await saveBank(partial);
+              await patch({ bankId: partial.id, count: partial.questions.length });
+            },
+          },
+        );
     } else if (folder.profile === 'idioms') {
       bank = idioms.finish(bankId);
       if (!bank.study.length) {
@@ -245,11 +268,31 @@ async function processPractice(
         bank = await generalBank(pages, folder.area, bankId, id, pdf, progress, signal);
       }
     } else {
-      const candidate = math.finish(bankId),
+      const normal = math.finish(bankId),
+        generic = sourceQuestions.finish(bankId);
+      const useGeneric = generic.questions.length >= normal.questions.length;
+      const candidate = useGeneric ? generic : normal,
         phrases = idioms.finish(bankId);
-      if (candidate.questions.length && !candidate.warnings.length && folder.area !== 'reading')
+      if (candidate.questions.length || sourceQuestions.hasChoices()) {
         bank = { ...candidate, kind: 'general' };
-      else if (
+        if (bank.warnings.length)
+          bank = await recoverMaths(
+            bank,
+            useGeneric ? sourceQuestions.sourceAnswers() : math.sourceAnswers(),
+            id,
+            pdf,
+            progress,
+            signal,
+            {
+              fragments: useGeneric ? sourceQuestions.recoveryFragments() : undefined,
+              area: folder.area,
+              onCheckpoint: async (partial) => {
+                await saveBank(partial);
+                await patch({ bankId: partial.id, count: partial.questions.length });
+              },
+            },
+          );
+      } else if (
         vocabulary.length >= 2 &&
         vocabulary.every((e) => e.meaningEn && (e.meaningHi || e.synonyms.length))
       ) {

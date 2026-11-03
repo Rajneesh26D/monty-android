@@ -3,18 +3,18 @@ package com.monty.study;
 import android.Manifest;
 import android.app.ActivityManager;
 import android.os.PowerManager;
-import androidx.activity.result.ActivityResult;
+
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Build;
 import android.provider.Settings;
 import com.getcapacitor.*;
 import com.getcapacitor.annotation.*;
-import java.util.concurrent.atomic.AtomicBoolean;
+
 
 @CapacitorPlugin(name = "MontyUpdater", permissions = @Permission(alias = "notifications", strings = { Manifest.permission.POST_NOTIFICATIONS }))
 public class MontyUpdaterPlugin extends Plugin {
-    private final AtomicBoolean installing = new AtomicBoolean(false);
+
     @PluginMethod public void getStatus(PluginCall call) {
         try {
             JSObject status = new JSObject();
@@ -29,8 +29,9 @@ public class MontyUpdaterPlugin extends Plugin {
             status.put("lastChecked", UpdateService.prefs(getContext()).getLong("lastChecked", 0));
             String installMessage = UpdateService.prefs(getContext()).getString("installMessage", "");
             long fromVersion = UpdateService.prefs(getContext()).getLong("installVersion", 0);
-            if (fromVersion > 0 && UpdateService.installedCode(getContext()) > fromVersion) installMessage = "Update installed successfully.";
+            if (fromVersion > 0 && UpdateService.installedCode(getContext()) > fromVersion && !"error".equals(UpdateService.prefs(getContext()).getString("updateStage","")) && !"checking".equals(UpdateService.prefs(getContext()).getString("updateStage",""))) installMessage = "Update installed successfully.";
             status.put("installMessage", installMessage);
+            status.put("updateStage",UpdateService.prefs(getContext()).getString("updateStage",""));
             status.put("packageName", getContext().getPackageName());
             status.put("architecture", UpdateService.arm64() ? "arm64-v8a" : "universal");
             call.resolve(status);
@@ -52,31 +53,9 @@ public class MontyUpdaterPlugin extends Plugin {
         });
     }
     @PluginMethod public void installLatest(PluginCall call) {
-        if (Build.VERSION.SDK_INT >= 26 && !getContext().getPackageManager().canRequestPackageInstalls()) {
-            startActivityForResult(call,new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,Uri.parse("package:"+getContext().getPackageName())),"installPermissionResult");return;
-        }
-        beginInstall(call);
-    }
-    @ActivityCallback private void installPermissionResult(PluginCall call,ActivityResult result){
-        if(call==null)return;
-        if(Build.VERSION.SDK_INT>=26 && !getContext().getPackageManager().canRequestPackageInstalls()) {
-            call.reject("Android did not allow installation from Monty. Allow this source to install an update.");return;
-        }
-        beginInstall(call);
-    }
-    private void beginInstall(PluginCall call){
-        if (!installing.compareAndSet(false, true)) { call.reject("An update download is already running."); return; }
-        getBridge().execute(() -> {
-            try {
-                UpdateManifest m = UpdateService.latest(getContext());
-                java.io.File apk = UpdateService.download(getContext(), m);
-                Intent installer=UpdateService.prepareInstall(getContext(),apk);
-                getActivity().runOnUiThread(() -> {
-                    try { UpdateService.launchInstaller(getActivity(),installer); call.resolve(); }
-                    catch (Exception e) { call.reject("Could not open Android's installer. Try downloading the APK from the Monty download page."); }
-                    finally { installing.set(false); }
-                });
-            } catch (Exception e) { installing.set(false); call.reject(message(e)); }
+        getActivity().runOnUiThread(()->{
+            try {getActivity().startActivity(new Intent(getActivity(),UpdateActivity.class));call.resolve();}
+            catch(Exception e){call.reject("Could not open the update screen: "+message(e));}
         });
     }
     @PluginMethod public void setNotifications(PluginCall call) {

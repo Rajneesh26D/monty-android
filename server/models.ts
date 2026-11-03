@@ -13,6 +13,7 @@ export const PRIORITY = [
   'xingchen-agi/xing4.0-29b-a4b:free',
 ];
 export class APIError extends Error {
+  diagnostics?: { provider: string; outcome: string; status?: number }[];
   constructor(
     public status: number,
     message: string,

@@ -61,6 +61,14 @@ jobs:
             "$ANDROID_HOME/build-tools/36.0.0/zipalign" -c -P 16 -v 4 "$apk"
           done
           python3 scripts/check-android-elf.py release/*.apk
+      - name: Build a higher-version signed APK for the complete in-app update test
+        run: |
+          monty_next_code=$(node -p 'require("./android-version.json").versionCode+1')
+          monty_next_name="${{ steps.version.outputs.name }}-ci"
+          ./android/gradlew -p android assembleRelease --no-daemon -PmontyVersionCode="$monty_next_code" -PmontyVersionName="$monty_next_name"
+          cp android/app/build/outputs/apk/release/app-universal-release.apk "$RUNNER_TEMP/monty-next.apk"
+          echo "MONTY_TEST_NEXT_CODE=$monty_next_code" >> "$GITHUB_ENV"
+          echo "MONTY_TEST_NEXT_NAME=$monty_next_name" >> "$GITHUB_ENV"
       - name: Enable Android emulator hardware acceleration
         run: sudo chmod 666 /dev/kvm
       - name: Android 16 in-place upgrade preserves app data

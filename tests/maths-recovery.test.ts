@@ -85,7 +85,8 @@ it('uses page images when text is absent and keeps uncertain AI coverage visible
   expect(scanned.image).toHaveBeenCalledWith(1);
   expect(mocks.extract.mock.calls[0][0].pages[0].image).toBe('data:image/jpeg;base64,AAAA');
   expect(fixed.warnings.join(' ')).toContain('unresolved');
-  expect(mocks.save).not.toHaveBeenCalled();
+  expect(mocks.save).toHaveBeenCalled();
+  expect(mocks.save.mock.calls[0][1].questions).toHaveLength(1);
 });
 it('limits dense numbered pages to six target questions per request', async () => {
   const dense = Array.from(
@@ -117,4 +118,45 @@ it('limits dense numbered pages to six target questions per request', async () =
   expect(mocks.extract.mock.calls.map((call) => call[0].targets.length)).toEqual([6, 6, 1]);
   expect(fixed.questions).toHaveLength(13);
   expect(fixed.warnings).toEqual([]);
+});
+it('merges recovery into the same English quiz, checkpoints partial success, and resumes only missing questions', async () => {
+  const saved = new Map();
+  mocks.read.mockImplementation(async (key) => saved.get(key));
+  mocks.save.mockImplementation(async (key, value) => saved.set(key, value));
+  const mixed = {
+    ...bank,
+    kind: 'general' as const,
+    warnings: ['Could not locate questions: 1, 2.'],
+  };
+  const both = {
+    ...pdf,
+    page: vi.fn(async () => ({
+      ...page,
+      text: page.text + '\n2. Second source question?',
+      items: [{ ...page.items[0], text: page.text + '\n2. Second source question?' }],
+    })),
+  };
+  const checkpoint = vi.fn();
+  mocks.extract
+    .mockResolvedValueOnce({ ...result, unresolved: [2] })
+    .mockRejectedValueOnce(new Error('capacity'));
+  const partial = await recoverMaths(mixed, [], 'source', both, () => {}, undefined, {
+    area: 'grammar',
+    onCheckpoint: checkpoint,
+  });
+  expect(partial.questions.map((q) => q.number)).toEqual([1]);
+  expect(checkpoint).toHaveBeenCalled();
+  expect(mocks.extract.mock.calls[0][0].area).toBe('grammar');
+  expect(mocks.extract.mock.calls[0][0].task).toBe('recover-questions');
+  mocks.extract.mockClear();
+  mocks.extract.mockResolvedValue({
+    ...result,
+    questions: [{ ...result.questions[0], number: 2 }],
+  });
+  const complete = await recoverMaths(mixed, [], 'source', both, () => {}, undefined, {
+    area: 'grammar',
+  });
+  expect(mocks.extract.mock.calls[0][0].targets).toEqual([2]);
+  expect(complete.questions.map((q) => q.id)).toEqual(['bank-q1', 'bank-q2']);
+  expect(complete.warnings).toEqual([]);
 });
