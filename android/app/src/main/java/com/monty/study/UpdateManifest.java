@@ -25,7 +25,7 @@ final class UpdateManifest {
         URI uri = new URI(url);
         URI gateway = new URI(BuildConfig.UPDATE_GATEWAY);
         boolean trustedDownload = ("github.com".equals(uri.getHost()) && uri.getPath().startsWith("/" + repository + "/releases/download/")) ||
-            (gateway.getHost().equals(uri.getHost()) && uri.getPath().startsWith("/downloads/"));
+            ((gateway.getHost().equals(uri.getHost()) || "monty-mobile.fuzzygenet512.chatgpt.site".equals(uri.getHost())) && uri.getPath().startsWith("/downloads/"));
         if (!"https".equals(uri.getScheme()) || !trustedDownload ||
             uri.getUserInfo() != null || uri.getPort() != -1 || uri.getQuery() != null || uri.getFragment() != null ||
             !uri.getPath().endsWith(".apk") ||

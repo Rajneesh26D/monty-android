@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 const manifest = JSON.parse(await readFile('release/mobile-update.json', 'utf8'));
-const origin = 'https://monty-mobile.fuzzygenet512.chatgpt.site';
+const origin = 'https://monty-mobile.rajneeshdhayal3.chatgpt.site';
 const token = process.env.MONTY_UPLOAD_TOKEN;
 if (!token) throw new Error('The signing setup must include the mobile release upload credential.');
 const headers = { Authorization: 'Bearer ' + token };

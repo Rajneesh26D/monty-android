@@ -37,6 +37,11 @@ public class UpdateManifestTest {
         json.getJSONObject("packages").getJSONObject("arm64-v8a").put("url", BuildConfig.UPDATE_GATEWAY + "/other/app.apk");
         rejected(json);
     }
+    @Test public void acceptsLegacyReleaseUrlsForPreviouslyInstalledClients() throws Exception {
+        JSONObject json = release();
+        json.getJSONObject("packages").getJSONObject("arm64-v8a").put("url", "https://monty-mobile.fuzzygenet512.chatgpt.site/downloads/2.1.8/Monty-2.1.8-arm64-v8a.apk");
+        assertTrue(parse(json, true).url.contains("fuzzygenet512"));
+    }
     @Test public void rejectsUntrustedDownloadLocations() throws Exception {
         for (String url : new String[]{
             "http://github.com/Rajneesh26D/monty-android/releases/download/v2/app.apk",

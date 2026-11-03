@@ -78,7 +78,12 @@ export function validatePartialQuestions(value: unknown, input: MathsRequest): M
     rejected = new Set<number>();
   for (const candidate of raw.questions) {
     const parsed = mathsOutputSchema.shape.questions.element.safeParse(candidate);
-    if (!parsed.success) continue;
+    if (!parsed.success) {
+      console.info('Recovery metadata rejected', {
+        fields: parsed.error.issues.map((issue) => issue.path.join('.')),
+      });
+      continue;
+    }
     const q = parsed.data;
     if (input.exclude?.some((old) => ref(old) === ref(q))) continue;
     try {
@@ -94,7 +99,10 @@ export function validatePartialQuestions(value: unknown, input: MathsRequest): M
         throw new Error('Unexpected question');
       if (questions.some((old) => ref(old) === ref(q))) throw new Error('Repeated question');
       questions.push(check.questions[0]);
-    } catch {
+    } catch (error) {
+      console.info('Recovery source validation rejected', {
+        reason: error instanceof Error ? error.message : 'invalid question',
+      });
       rejected.add(q.number);
     }
   }
@@ -128,7 +136,7 @@ function diagnostic(provider: string, error: unknown): Diagnostic {
     outcome:
       status === 429
         ? 'capacity'
-        : status === 401 || status === 403
+        : status === 401
           ? 'authentication'
           : timeout
             ? 'timeout'
@@ -265,21 +273,22 @@ export async function mathsAI(
           if (!response.ok) {
             const body = await response.text();
             const quota =
-              response.status === 429 && /daily|per.day|free-models-per-day/i.test(body);
+              response.status === 429 &&
+              /free-models-per-day|daily.*free.*request|free.*requests.*per.day/i.test(body);
             diagnostics.push({
               provider,
               outcome: quota
                 ? 'quota'
                 : response.status === 429
                   ? 'capacity'
-                  : [401, 403].includes(response.status)
+                  : response.status === 401
                     ? 'authentication'
                     : 'unavailable',
               status: response.status,
             });
             // Models on this account share the daily quota/key. Trying ten more
             // model names cannot repair an exhausted account or invalid credential.
-            if (quota || [401, 403].includes(response.status)) break;
+            if (quota) break;
             continue;
           }
           const data = (await response.json()) as any;
@@ -304,8 +313,12 @@ export async function mathsAI(
     });
   if (!result.questions.length) {
     const summary =
-      diagnostics.map((d) => `${d.provider}: ${d.outcome.replace('-', ' ')}`).join('; ') ||
-      'No compatible source-reading model was available';
+      diagnostics
+        .map(
+          (d) =>
+            `${d.provider}: ${d.outcome.replace('-', ' ')}${d.status ? ' (HTTP ' + d.status + ')' : ''}`,
+        )
+        .join('; ') || 'No compatible source-reading model was available';
     const limited =
       diagnostics.length > 0 &&
       diagnostics.every((d) => d.outcome === 'capacity' || d.outcome === 'quota');

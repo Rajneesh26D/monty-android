@@ -136,18 +136,16 @@ it('tries DeepSeek text extraction even when an optional page image is present',
   vi.resetModules();
   const { mathsAI } = await import('../server/maths');
   const bucket = { get: vi.fn().mockResolvedValue(null), put: vi.fn() } as any;
-  const fetcher = vi
-    .fn()
-    .mockResolvedValue(
-      Response.json({
-        choices: [
-          {
-            finish_reason: 'stop',
-            message: { content: JSON.stringify({ questions: [question] }) },
-          },
-        ],
-      }),
-    );
+  const fetcher = vi.fn().mockResolvedValue(
+    Response.json({
+      choices: [
+        {
+          finish_reason: 'stop',
+          message: { content: JSON.stringify({ questions: [question] }) },
+        },
+      ],
+    }),
+  );
   const result = await mathsAI(
     { ...input, pages: [{ ...input.pages[0], image: 'data:image/jpeg;base64,AAAA' }] },
     'test-secret',
@@ -183,4 +181,30 @@ it('does not stop after three capacity-limited free models', async () => {
     1,
   );
   expect(attempts).toBe(4);
+});
+it('continues after a model-specific HTTP 403 instead of treating it as a dead account key', async () => {
+  vi.resetModules();
+  const { mathsAI } = await import('../server/maths');
+  const bucket = { get: vi.fn().mockResolvedValue(null), put: vi.fn() } as any;
+  let attempts = 0;
+  const fetcher = vi.fn(async (url: string) => {
+    if (url.endsWith('/models'))
+      return Response.json({
+        data: [
+          { id: 'restricted:free', pricing: { prompt: '0', completion: '0' } },
+          { id: 'available:free', pricing: { prompt: '0', completion: '0' } },
+        ],
+      });
+    attempts++;
+    if (attempts === 1) return new Response('Provider restriction', { status: 403 });
+    return Response.json({
+      choices: [
+        { finish_reason: 'stop', message: { content: JSON.stringify({ questions: [question] }) } },
+      ],
+    });
+  }) as any;
+  const result = await mathsAI(input, undefined, bucket, fetcher, 'test-key');
+  expect(attempts).toBe(2);
+  expect(result.questions).toHaveLength(1);
+  expect(result.diagnostics[0]).toMatchObject({ outcome: 'unavailable', status: 403 });
 });

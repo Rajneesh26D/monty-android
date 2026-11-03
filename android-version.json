@@ -1,5 +1,5 @@
 {
-  "versionCode": 20107,
-  "versionName": "2.1.7",
-  "notes": "Extract numbered and inline English MCQs locally; recover only missing questions across subjects, retain partial quizzes, report provider limits accurately, and use a native update screen with download progress and installer retry."
+  "versionCode": 20108,
+  "versionName": "2.1.8",
+  "notes": "Recover only failed PDF questions with AI while keeping completed quizzes; parse inline and numbered choices plus separate answer sheets; show native update progress, resume Android installation permission, and connect directly to the current shared backend."
 }
