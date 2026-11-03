@@ -58,7 +58,7 @@ export default {
             const asset = manifest.packages?.[abi];
             if (!asset || !/^[a-f0-9]{64}$/.test(asset.sha256)) return reply({ error: 'Invalid APK metadata' }, 400);
             const name = 'Monty-' + version + '-' + abi + '.apk';
-            if (asset.url !== url.origin + '/downloads/' + version + '/' + name) return reply({ error: 'Invalid APK URL' }, 400);
+            if (![url.origin, 'https://monty-mobile.fuzzygenet512.chatgpt.site'].some(host => asset.url === host + '/downloads/' + version + '/' + name)) return reply({ error: 'Invalid APK URL' }, 400);
             const file = await env.BUCKET.head('releases/' + version + '/' + name);
             if (!file || file.size !== asset.size) return reply({ error: 'An APK is missing or incomplete.' }, 409);
           }

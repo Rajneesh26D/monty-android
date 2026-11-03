@@ -143,7 +143,7 @@ it('rejects expired connection codes and revoked/unknown tokens and never become
   expect(await (await phone('/')).text()).not.toContain('server-only-test-token');
 });
 
-it('requires release upload authorization and publishes downloads only after every asset is complete', async () => {
+it.each([mobile, 'https://monty-mobile.fuzzygenet512.chatgpt.site'])('publishes complete immutable releases from the trusted %s download host', async (downloadHost) => {
   const { phone, relay } = setup();
   expect(
     (await phone('/admin/publish', { method: 'POST', body: '{"version":"2.1.0"}' })).status,
@@ -160,7 +160,7 @@ it('requires release upload authorization and publishes downloads only after eve
   };
   for (const abi of ['arm64-v8a', 'universal'])
     manifest.packages[abi] = {
-      url: mobile + '/downloads/2.1.0/Monty-2.1.0-' + abi + '.apk',
+      url: downloadHost + '/downloads/2.1.0/Monty-2.1.0-' + abi + '.apk',
       sha256: 'a'.repeat(64),
       size: 4,
     };

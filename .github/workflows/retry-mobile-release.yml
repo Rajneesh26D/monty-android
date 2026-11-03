@@ -1,0 +1,44 @@
+name: Retry mobile release distribution
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Existing published version, without v
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: monty-android-release
+  cancel-in-progress: false
+
+jobs:
+  distribute:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Download the immutable tested GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || exit 1
+          gh release download "v$VERSION" --dir release --pattern '*.apk' --pattern update.json --pattern SHA256SUMS.txt
+          node scripts/prepare-published-mobile-release.mjs
+      - name: Restore the existing release upload credential
+        env:
+          MONTY_SIGNING_BUNDLE: ${{ secrets.MONTY_SIGNING_BUNDLE }}
+          MONTY_SIGNING_KEY: ${{ secrets.MONTY_SIGNING_KEY }}
+        run: node scripts/restore-android-signing.mjs
+      - name: Publish the complete mobile release
+        run: node scripts/publish-mobile-release.mjs
+      - name: Remove temporary signing key
+        if: always()
+        run: rm -f "$RUNNER_TEMP/monty-release.jks"
