@@ -822,3 +822,112 @@
     max-height: calc(100dvh - 20px);
   }
 }
+
+/* Deliberate desktop exam-centre quirks, requested for practice. The class is
+   enabled only in non-native, wide, fine-pointer browser windows. */
+@media (min-width: 1024px) and (hover: hover) and (pointer: fine) {
+  .cbt-desktop-quirks {
+    --cbt-palette-width: 306px;
+  }
+  .cbt-desktop-quirks .cbt-body {
+    position: relative;
+    display: block;
+    overflow: hidden;
+  }
+  .cbt-desktop-quirks .cbt-workspace {
+    width: 100%;
+    height: 100%;
+  }
+  .cbt-desktop-quirks .cbt-question-bar,
+  .cbt-desktop-quirks .cbt-question-footer {
+    width: calc(100% - var(--cbt-palette-width));
+  }
+  .cbt-desktop-quirks .cbt-question-scroll {
+    overflow-x: hidden;
+    scrollbar-width: none;
+  }
+  .cbt-desktop-quirks .cbt-question-scroll::-webkit-scrollbar {
+    display: none;
+  }
+  .cbt-desktop-quirks .cbt-question-scroll > * {
+    max-width: none;
+    margin-inline: 0;
+  }
+  .cbt-desktop-quirks .question-stem {
+    font-size: 24px;
+    line-height: 1.85;
+  }
+  .cbt-desktop-quirks .passage {
+    font-size: 22px;
+    line-height: 1.8;
+  }
+  .cbt-desktop-quirks .cbt-option,
+  .cbt-desktop-quirks .option-heading {
+    font-size: 21px;
+  }
+  .cbt-desktop-quirks .cbt-sidebar {
+    position: absolute;
+    inset: 0 0 0 auto;
+    width: var(--cbt-palette-width);
+    z-index: 4;
+  }
+  .cbt-desktop-quirks .cbt-simulation-scrollbar {
+    position: absolute;
+    right: var(--cbt-palette-width);
+    width: 16px;
+    overflow-x: hidden;
+    overflow-y: scroll;
+    scrollbar-width: auto;
+    scrollbar-color: #8493a0 #e0e6eb;
+    background: #e0e6eb;
+    z-index: 5;
+  }
+  .cbt-simulation-scrollbar::-webkit-scrollbar {
+    width: 16px;
+  }
+  .cbt-simulation-scrollbar::-webkit-scrollbar-track {
+    background: #e0e6eb;
+  }
+  .cbt-simulation-scrollbar::-webkit-scrollbar-thumb {
+    background: #8493a0;
+    border: 2px solid #e0e6eb;
+  }
+  .cbt-desktop-quirks .cbt-palette-collapse {
+    position: absolute;
+    top: 50%;
+    right: calc(var(--cbt-palette-width) - 8px);
+    width: 22px;
+    height: 42px;
+    min-height: 0;
+    padding: 0;
+    transform: translateY(-50%);
+    clip-path: polygon(0 0, 100% 50%, 0 100%);
+    background: #205d89;
+    border: 0;
+    border-radius: 0;
+    z-index: 6;
+    cursor: pointer;
+  }
+  .cbt-desktop-quirks.is-palette-collapsed {
+    --cbt-palette-width: 0px;
+  }
+  .cbt-desktop-quirks.is-palette-collapsed .cbt-sidebar {
+    display: none;
+  }
+  .cbt-desktop-quirks.is-palette-collapsed .cbt-palette-collapse {
+    right: 0;
+    clip-path: polygon(100% 0, 0 50%, 100% 100%);
+  }
+  .cbt-desktop-quirks.is-palette-collapsed .cbt-mobile-submit {
+    display: inline-flex;
+    margin-left: auto;
+  }
+}
+@media (min-width: 1600px) and (hover: hover) and (pointer: fine) {
+  .cbt-desktop-quirks {
+    --cbt-palette-width: 340px;
+  }
+  .cbt-desktop-quirks.is-palette-collapsed {
+    --cbt-palette-width: 0px;
+  }
+}

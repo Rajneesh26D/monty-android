@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import { Capacitor } from '@capacitor/core';
 import {
   ArrowLeft,
   ArrowRight,
@@ -62,6 +63,11 @@ export function ComputerExam({
     instructions = useRef<HTMLDialogElement>(null),
     summary = useRef<HTMLDialogElement>(null),
     questionPane = useRef<HTMLDivElement>(null);
+  const scrollRail = useRef<HTMLDivElement>(null);
+  const sidebarId = useId();
+  const [desktopQuirks, setDesktopQuirks] = useState(false),
+    [paletteCollapsed, setPaletteCollapsed] = useState(false),
+    [railBounds, setRailBounds] = useState({ top: 0, height: 0, contentHeight: 0 });
   const [working, setWorking] = useState(false),
     [error, setError] = useState(''),
     [fullScreen, setFullScreen] = useState(false),
@@ -84,6 +90,54 @@ export function ComputerExam({
     questionPane.current?.scrollTo({ top: 0 });
     setSavedLast(false);
   }, [index]);
+  useEffect(() => {
+    // This deliberately awkward training layout is for mouse/trackpad desktop
+    // browsers only. Native Android and touch-first web layouts stay unchanged.
+    if (Capacitor.isNativePlatform()) return;
+    const media = matchMedia('(min-width: 1024px) and (hover: hover) and (pointer: fine)');
+    const update = () => {
+      setDesktopQuirks(media.matches);
+      if (!media.matches) setPaletteCollapsed(false);
+    };
+    update();
+    media.addEventListener('change', update);
+    return () => media.removeEventListener('change', update);
+  }, []);
+  useEffect(() => {
+    if (!desktopQuirks || !questionPane.current) return;
+    const pane = questionPane.current;
+    const measure = () => {
+      const body = pane.closest('.cbt-body');
+      if (!body) return;
+      const next = {
+        top: pane.getBoundingClientRect().top - body.getBoundingClientRect().top,
+        height: pane.clientHeight,
+        contentHeight: pane.scrollHeight,
+      };
+      setRailBounds((old) =>
+        old.top === next.top &&
+        old.height === next.height &&
+        old.contentHeight === next.contentHeight
+          ? old
+          : next,
+      );
+      if (scrollRail.current) scrollRail.current.scrollTop = pane.scrollTop;
+    };
+    const resize = new ResizeObserver(measure);
+    const observe = () => {
+      resize.disconnect();
+      resize.observe(pane);
+      for (const child of pane.children) resize.observe(child);
+      measure();
+    };
+    const mutation = new MutationObserver(observe);
+    mutation.observe(pane, { childList: true, subtree: true, characterData: true });
+    observe();
+    return () => {
+      resize.disconnect();
+      mutation.disconnect();
+    };
+  }, [desktopQuirks, paletteCollapsed]);
   useEffect(() => {
     const media = matchMedia('(min-width: 1024px)');
     const resize = () => {
@@ -139,7 +193,13 @@ export function ComputerExam({
     </button>
   );
   return (
-    <div className="exam-page cbt-exam">
+    <div
+      className={
+        'exam-page cbt-exam' +
+        (desktopQuirks ? ' cbt-desktop-quirks' : '') +
+        (desktopQuirks && paletteCollapsed ? ' is-palette-collapsed' : '')
+      }
+    >
       <header className="cbt-header">
         <div className="cbt-brand">
           <strong>Monty</strong>
@@ -218,7 +278,14 @@ export function ComputerExam({
               <Bookmark size={18} fill={saved ? 'currentColor' : 'none'} />
             </button>
           </div>
-          <div className="cbt-question-scroll" ref={questionPane}>
+          <div
+            className="cbt-question-scroll"
+            ref={questionPane}
+            onScroll={() => {
+              if (desktopQuirks && scrollRail.current && questionPane.current)
+                scrollRail.current.scrollTop = questionPane.current.scrollTop;
+            }}
+          >
             {timer.paused && (
               <div className="cbt-paused" role="status">
                 <strong>
@@ -307,7 +374,34 @@ export function ComputerExam({
             </div>
           </div>
         </section>
-        <aside className="cbt-sidebar" aria-label="Exam overview">
+        {desktopQuirks && (
+          <>
+            <div
+              className="cbt-simulation-scrollbar"
+              ref={scrollRail}
+              aria-hidden="true"
+              style={{ top: railBounds.top, height: railBounds.height }}
+              onScroll={() => {
+                if (questionPane.current && scrollRail.current)
+                  questionPane.current.scrollTop = scrollRail.current.scrollTop;
+              }}
+            >
+              <div style={{ height: railBounds.contentHeight }} />
+            </div>
+            <button
+              type="button"
+              className="cbt-palette-collapse"
+              aria-label={
+                paletteCollapsed ? 'Expand question palette' : 'Collapse question palette'
+              }
+              title={paletteCollapsed ? 'Expand question palette' : 'Collapse question palette'}
+              aria-controls={sidebarId}
+              aria-expanded={!paletteCollapsed}
+              onClick={() => setPaletteCollapsed((value) => !value)}
+            />
+          </>
+        )}
+        <aside id={sidebarId} className="cbt-sidebar" aria-label="Exam overview">
           <div className="cbt-candidate">
             <span className="cbt-avatar">
               <UserRound size={32} />
