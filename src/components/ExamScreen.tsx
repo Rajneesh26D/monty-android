@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { ArrowLeft, Pause, Play, Bookmark } from 'lucide-react';
+import { ArrowLeft, Bookmark } from 'lucide-react';
 import type { Bank, Exam, AttemptClock, MCQ } from '../../shared/monty';
 import { finishExam, time } from '../core/exams';
 import { useAttemptClock } from './useAttemptClock';
 import { MCQView } from './MCQView';
-import { QuestionTracker, ExamActions } from './QuestionTracker';
+import { ComputerExam } from './ComputerExam';
+import { navigateAttempt } from '../core/computerExam';
 export function ExamScreen({
   test,
   bank,
@@ -39,63 +40,38 @@ export function ExamScreen({
         ? { ...t, draft: fn({ ...t.draft, clock: { ...timer.capture()! } }) }
         : t,
     );
-  async function move(index: number) {
-    await change((d) => ({
-      ...d,
-      index,
-      visited: [...new Set([...(d.visited ?? []), question.id, test.questionIds[index]])],
-    }));
-    document.querySelector('main')?.scrollTo({ top: 0 });
-  }
-  const answered = test.questionIds.filter((id) => !!draft.answers[id]).length;
+  const ids = test.questionIds;
+  const navigate = async (action: 'jump' | 'save-next' | 'review-next', index?: number) => {
+    await change((d) => navigateAttempt(d, ids, action, index));
+  };
   return (
-    <div className="exam-page">
-      <div className="exam-toolbar">
-        <button className="back-button" onClick={() => void timer.pause().then(onExit)}>
-          <Pause size={16} /> Save & exit
-        </button>
-        <div className="quiz-status">
-          <span className="quiz-position">
-            Question {draft.index + 1} of {test.questionIds.length}
-          </span>
-          <strong className={timer.remaining < 60000 ? 'timer urgent' : 'timer'} role="timer">
-            {time(timer.remaining)}
-          </strong>
-        </div>
-      </div>
-      <p className="eyebrow">{test.name}</p>
-      <QuestionTracker
-        ids={test.questionIds}
-        index={draft.index}
-        answered={(id) => !!draft.answers[id]}
-        visited={draft.visited}
-        marked={draft.marked}
-        onNavigate={(index) => void move(index)}
-      />
-      {timer.paused && (
-        <div className="notice">
-          <strong>
-            {timer.busy
-              ? 'This test is open in another tab. Close or pause it there first.'
-              : 'Test paused'}
-          </strong>
-          <button className="primary" disabled={timer.busy} onClick={() => void timer.resume()}>
-            <Play size={16} /> Resume timer
-          </button>
-        </div>
-      )}
-      <div className="question-meta">
-        <span className="eyebrow">Select one answer</span>
-        <button
-          className="icon-button bookmark"
-          aria-label={saved(question) ? 'Remove test bookmark' : 'Bookmark test question'}
-          aria-pressed={saved(question)}
-          onClick={() => onBookmark(question)}
-        >
-          <Bookmark fill={saved(question) ? 'currentColor' : 'none'} size={21} />
-        </button>
-      </div>
+    <ComputerExam
+      title={test.name}
+      section={bank.kind === 'maths' ? 'Mathematics' : 'English'}
+      ids={ids}
+      index={draft.index}
+      answered={(id) => !!draft.answers[id]}
+      visited={draft.visited}
+      marked={draft.marked}
+      timer={timer}
+      saved={saved(question)}
+      onBookmark={() => onBookmark(question)}
+      onMove={(index) => navigate('jump', index)}
+      onSaveNext={() => navigate('save-next')}
+      onReviewNext={() => navigate('review-next')}
+      hasAnswer={!!draft.answers[question.id]}
+      onClear={() =>
+        change((d) => {
+          const answers = { ...d.answers };
+          delete answers[question.id];
+          return { ...d, answers };
+        })
+      }
+      onExit={onExit}
+      onSubmit={() => finish(timer.capture()!)}
+    >
       <MCQView
+        exam
         maths={bank.kind === 'maths'}
         question={question}
         selected={draft.answers[question.id]}
@@ -108,39 +84,7 @@ export function ExamScreen({
           }))
         }
       />
-      <ExamActions
-        index={draft.index}
-        total={test.questionIds.length}
-        paused={timer.paused}
-        marked={!!draft.marked?.includes(question.id)}
-        hasAnswer={!!draft.answers[question.id]}
-        onMove={(index) => void move(index)}
-        onClear={() =>
-          void change((d) => {
-            const answers = { ...d.answers };
-            delete answers[question.id];
-            return { ...d, answers };
-          })
-        }
-        onMark={() =>
-          void change((d) => ({
-            ...d,
-            visited: [...new Set([...(d.visited ?? []), question.id])],
-            marked: d.marked?.includes(question.id)
-              ? d.marked.filter((id) => id !== question.id)
-              : [...(d.marked ?? []), question.id],
-          }))
-        }
-        onSubmit={() => {
-          if (
-            confirm(
-              `Submit this test? ${answered} answered, ${test.questionIds.length - answered} unanswered, ${draft.marked?.length ?? 0} marked for review. Saved answers on marked questions will also be scored.`,
-            )
-          )
-            void finish(timer.capture()!);
-        }}
-      />
-    </div>
+    </ComputerExam>
   );
 }
 export function ExamAnalysis({

@@ -511,7 +511,7 @@ export default function App({
                 setTab('quiz');
               }}
               onSubmit={() =>
-                void act(async () => {
+                act(async () => {
                   await commit((s) => ({
                     ...s,
                     tests: s.tests.map((t) =>

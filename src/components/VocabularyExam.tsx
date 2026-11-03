@@ -1,10 +1,8 @@
 import type { Kind, QuizTest } from '../../shared/types';
 import type { useAttemptClock } from './useAttemptClock';
-import { Pause } from 'lucide-react';
-import { time } from '../core/exams';
 import { Choices } from './Question';
-import { BookmarkButton } from './WordCard';
-import { QuestionTracker, ExamActions } from './QuestionTracker';
+import { ComputerExam } from './ComputerExam';
+import { navigateAttempt } from '../core/computerExam';
 
 export function VocabularyExam({
   test,
@@ -19,7 +17,7 @@ export function VocabularyExam({
   timer: ReturnType<typeof useAttemptClock>;
   onUpdate: (change: (test: QuizTest) => QuizTest) => Promise<unknown>;
   onExit: () => void;
-  onSubmit: () => void;
+  onSubmit: () => Promise<unknown>;
   saved: boolean;
   onBookmark: () => void;
 }) {
@@ -35,14 +33,8 @@ export function VocabularyExam({
         ? { ...t, draft: fn({ ...t.draft, clock: timer.capture() }) }
         : t,
     );
-  const move = (index: number) => {
-    void change((d) => ({
-      ...d,
-      index,
-      visited: [...new Set([...(d.visited ?? []), q.id, ids[index]])],
-    }));
-    document.querySelector('main')?.scrollTo({ top: 0 });
-  };
+  const navigate = (action: 'jump' | 'save-next' | 'review-next', index?: number) =>
+    change((d) => navigateAttempt(d, ids, action, index));
   const choose = (id: string, kind: Kind) =>
     void change((d) => ({
       ...d,
@@ -50,78 +42,36 @@ export function VocabularyExam({
       answers: { ...d.answers, [q.id]: { ...d.answers[q.id], [id]: kind } },
     }));
   return (
-    <div className="active-quiz exam-page">
-      <div className="exam-toolbar">
-        <button className="back-button" onClick={() => void timer.pause().then(onExit)}>
-          <Pause size={17} /> Save & exit
-        </button>
-        <div className="quiz-status">
-          <span className="quiz-position">
-            Question {draft.index + 1} of {test.questions.length}
-          </span>
-          <strong className={timer.remaining < 60000 ? 'timer urgent' : 'timer'} role="timer">
-            {time(timer.remaining)}
-          </strong>
-        </div>
-      </div>
-      <p className="eyebrow">{test.name}</p>
-      <QuestionTracker
-        ids={ids}
-        index={draft.index}
-        answered={answered}
-        visited={[...(draft.visited ?? []), ...Object.keys(draft.answers)]}
-        marked={draft.marked}
-        onNavigate={move}
-      />
-      <div className="question-meta">
-        <span className="eyebrow">Classify each option</span>
-        <BookmarkButton saved={saved} onClick={onBookmark} />
-      </div>
+    <ComputerExam
+      title={test.name}
+      section="Vocabulary"
+      ids={ids}
+      index={draft.index}
+      answered={answered}
+      visited={[...(draft.visited ?? []), ...Object.keys(draft.answers)]}
+      marked={draft.marked}
+      timer={timer}
+      saved={saved}
+      onBookmark={onBookmark}
+      onMove={(index) => navigate('jump', index)}
+      onSaveNext={() => navigate('save-next')}
+      onReviewNext={() => navigate('review-next')}
+      hasAnswer={Object.keys(answers).length > 0}
+      onClear={() =>
+        change((d) => {
+          const answers = { ...d.answers };
+          delete answers[q.id];
+          return { ...d, answers };
+        })
+      }
+      onExit={onExit}
+      onSubmit={onSubmit}
+    >
       <div className="quiz-head">
+        <p className="cbt-word-instruction">Classify each option as a synonym or antonym of:</p>
         <h1>{q.entry.word}</h1>
       </div>
-      {timer.paused && (
-        <div className="notice">
-          <strong>{timer.busy ? 'This attempt is open in another tab.' : 'Test paused'}</strong>
-          <button className="primary" disabled={timer.busy} onClick={() => void timer.resume()}>
-            Resume timer
-          </button>
-        </div>
-      )}
       <Choices question={q} answers={answers} onChoose={choose} disabled={timer.paused} />
-      <ExamActions
-        index={draft.index}
-        total={ids.length}
-        paused={timer.paused}
-        marked={!!draft.marked?.includes(q.id)}
-        hasAnswer={Object.keys(answers).length > 0}
-        onMove={move}
-        onClear={() =>
-          void change((d) => {
-            const answers = { ...d.answers };
-            delete answers[q.id];
-            return { ...d, answers };
-          })
-        }
-        onMark={() =>
-          void change((d) => ({
-            ...d,
-            visited: [...new Set([...(d.visited ?? []), q.id])],
-            marked: d.marked?.includes(q.id)
-              ? d.marked.filter((id) => id !== q.id)
-              : [...(d.marked ?? []), q.id],
-          }))
-        }
-        onSubmit={() => {
-          const count = ids.filter(answered).length;
-          if (
-            confirm(
-              `Submit this test? ${count} answered, ${ids.length - count} incomplete or unanswered, ${draft.marked?.length ?? 0} marked for review. Saved selections on marked questions will also be scored.`,
-            )
-          )
-            onSubmit();
-        }}
-      />
-    </div>
+    </ComputerExam>
   );
 }

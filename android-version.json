@@ -1,5 +1,5 @@
 {
-  "versionCode": 20108,
-  "versionName": "2.1.8",
-  "notes": "Recover only failed PDF questions with AI while keeping completed quizzes; parse inline and numbered choices plus separate answer sheets; show native update progress, resume Android installation permission, and connect directly to the current shared backend."
+  "versionCode": 20109,
+  "versionName": "2.1.9",
+  "notes": "Add a computer based exam interface with a fixed timer, section bar, colour-coded question palette, Mark for Review & Next, Clear Response, Save & Next and submission summary. Responsive layouts support phones, tablets, laptops and large desktops."
 }

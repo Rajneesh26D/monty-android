@@ -9,6 +9,7 @@ export function MCQView({
   reveal = false,
   disabled = false,
   maths = false,
+  exam = false,
 }: {
   question: MCQ;
   selected?: string;
@@ -16,6 +17,7 @@ export function MCQView({
   reveal?: boolean;
   disabled?: boolean;
   maths?: boolean;
+  exam?: boolean;
 }) {
   const [sourceText, setSourceText] = useState(
     () => localStorage.getItem('monty-maths-source') === 'true',
@@ -60,34 +62,52 @@ export function MCQView({
         </h2>
       </div>
       <div className="mcq-options">
-        {question.options.map((option) => (
-          <button
-            key={option.id}
-            disabled={disabled}
-            className={
-              'mcq-option ' +
-              (selected === option.id ? 'chosen ' : '') +
-              (reveal
-                ? option.id === question.answerId
-                  ? 'correct '
-                  : selected === option.id
-                    ? 'incorrect '
-                    : ''
-                : '')
-            }
-            aria-pressed={selected === option.id}
-            onClick={() => onSelect?.(option.id)}
-          >
-            <span className="option-letter">{option.label}</span>
-            <span>
+        {question.options.map((option) =>
+          exam ? (
+            <label
+              className={'cbt-option ' + (selected === option.id ? 'is-selected' : '')}
+              key={option.id}
+            >
+              <input
+                type="radio"
+                name={'answer-' + question.id}
+                value={option.id}
+                checked={selected === option.id}
+                disabled={disabled}
+                onChange={() => onSelect?.(option.id)}
+              />
+              <span className="cbt-option-letter">({option.label.toLowerCase()})</span>
               <RichText text={display(option.text)} />
-              {reveal && option.id === question.answerId && <small>Correct answer</small>}
-              {reveal && selected === option.id && option.id !== question.answerId && (
-                <small>Your answer</small>
-              )}
-            </span>
-          </button>
-        ))}
+            </label>
+          ) : (
+            <button
+              key={option.id}
+              disabled={disabled}
+              className={
+                'mcq-option ' +
+                (selected === option.id ? 'chosen ' : '') +
+                (reveal
+                  ? option.id === question.answerId
+                    ? 'correct '
+                    : selected === option.id
+                      ? 'incorrect '
+                      : ''
+                  : '')
+              }
+              aria-pressed={selected === option.id}
+              onClick={() => onSelect?.(option.id)}
+            >
+              <span className="option-letter">{option.label}</span>
+              <span>
+                <RichText text={display(option.text)} />
+                {reveal && option.id === question.answerId && <small>Correct answer</small>}
+                {reveal && selected === option.id && option.id !== question.answerId && (
+                  <small>Your answer</small>
+                )}
+              </span>
+            </button>
+          ),
+        )}
       </div>
       {reveal && (
         <div className="answer-note">
