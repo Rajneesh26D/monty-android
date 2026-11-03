@@ -1,3 +1,4 @@
+import { QuizSplitControls } from './QuizSplitControls';
 import { useTestDuration } from './TestDuration';
 import { StudyNavigator } from './StudyNavigator';
 import { PdfCard } from './PdfCard';
@@ -25,8 +26,8 @@ import type { Folder, Attachment, Bank, Exam, MCQ, StudyItem } from '../../share
 import type { Commit } from '../services/importer';
 import { addPractice, importPractice, readBank, saveBank } from '../services/workspace';
 import { removeAttachment } from '../storage/repository';
-import { startExam, mathsTests, time } from '../core/exams';
-import { shuffle, splitSizes } from '../core/quiz';
+import { startExam, mathsTests, time, uniqueExamQuestions, createExamSet } from '../core/exams';
+import { shuffle, validSplit } from '../core/quiz';
 import { NotesPanel } from './NotesPanel';
 import { openPdfInApp } from '../services/openPdf';
 import { MCQView } from './MCQView';
@@ -71,6 +72,12 @@ export function StudyFolder({
     [custom, setCustom] = useState(false),
     [splits, setSplits] = useState(1),
     [limit, setLimit] = useState(30);
+  const [quizSource, setQuizSource] = useState<{
+    key: string;
+    questions: MCQ[];
+    study: StudyItem[];
+    error?: string;
+  } | null>(null);
   const controller = useRef<AbortController | null>(null),
     upload = useRef<HTMLInputElement>(null);
   const w = state.monty!,
@@ -189,51 +196,80 @@ export function StudyFolder({
       setProgress(null);
     }
   }
-  async function generate() {
-    let questions: MCQ[] = [],
-      study: StudyItem[] = [];
-    if (bookmarkSource) {
-      for (const ref of w.bookmarks[folder.id] ?? []) {
-        const [id, , key] = ref.split('|');
-        const b = await readBank(id);
-        const q = b.questions.find((q) => q.id === key);
-        if (q) questions.push(q);
+  const quizBookmarks = (math ? w.mathTestBookmarks[folder.id] : w.bookmarks[folder.id]) ?? [];
+  const quizSourceKey = JSON.stringify(
+    bookmarkSource
+      ? { bookmarks: quizBookmarks }
+      : { banks: files.filter((f) => selection.includes(f.id) && f.bankId).map((f) => f.bankId!) },
+  );
+  useEffect(() => {
+    if (tab !== 'quiz') return;
+    let cancelled = false;
+    const load = async () => {
+      const source = JSON.parse(quizSourceKey) as { bookmarks?: string[]; banks?: string[] };
+      let questions: MCQ[] = [],
+        study: StudyItem[] = [];
+      if (source.bookmarks) {
+        const bankIds = [...new Set(source.bookmarks.map((ref) => ref.split('|')[0]))];
+        const banks = new Map(
+          await Promise.all(bankIds.map(async (id) => [id, await readBank(id)] as const)),
+        );
+        for (const ref of source.bookmarks) {
+          const [id, , key] = ref.split('|');
+          const q = banks.get(id)?.questions.find((q) => q.id === key);
+          if (q) questions.push(q);
+        }
+      } else {
+        const banks = await Promise.all((source.banks ?? []).map(readBank));
+        questions = banks.flatMap((b) => b.questions);
+        study = banks.flatMap((b) => b.study);
       }
-    } else
-      for (const file of files.filter((f) => selection.includes(f.id) && f.bankId)) {
-        const b = await readBank(file.bankId!);
-        questions.push(...b.questions);
-        study.push(...b.study);
-      }
-    const seen = new Set<string>();
-    questions = questions.filter((q) => {
-      const key = (q.stem + '|' + q.passage + '|' + q.options.map((o) => o.text).join('|'))
-        .toLowerCase()
-        .replace(/\s+/g, ' ');
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
+      if (!cancelled)
+        setQuizSource({ key: quizSourceKey, questions: uniqueExamQuestions(questions), study });
+    };
+    void load().catch((error) => {
+      if (!cancelled)
+        setQuizSource({
+          key: quizSourceKey,
+          questions: [],
+          study: [],
+          error: error instanceof Error ? error.message : 'Could not load the selected questions.',
+        });
     });
+    return () => {
+      cancelled = true;
+    };
+  }, [tab, quizSourceKey]);
+  const readyQuizSource = quizSource?.key === quizSourceKey ? quizSource : null;
+  const availableQuestions = readyQuizSource?.questions.length ?? 0;
+  const requestedQuestions = Number(count);
+  const validQuestionCount =
+    Number.isInteger(requestedQuestions) &&
+    requestedQuestions >= 0 &&
+    (!custom || (!!count && requestedQuestions > 0 && requestedQuestions <= availableQuestions));
+  const selectedQuestionCount = validQuestionCount
+    ? Math.min(requestedQuestions || availableQuestions, availableQuestions)
+    : 0;
+  const validParts = validSplit(selectedQuestionCount, splits);
+  async function generate() {
+    if (!readyQuizSource) throw new Error('Wait for the selected questions to load.');
+    if (readyQuizSource.error) throw new Error(readyQuizSource.error);
+    let questions = readyQuizSource.questions;
+    const study = readyQuizSource.study;
     const n = Number(count);
     if (!questions.length) throw new Error('Select PDFs or bookmarks with ready questions.');
     if (!Number.isInteger(n) || n < 0 || (custom && (n < 1 || n > questions.length)))
       throw new Error(`Choose 1–${questions.length} questions, or All.`);
     questions = shuffle(questions).slice(0, n || questions.length);
-    const sizes = splitSizes(
-      questions.length,
-      !bookmarkSource && selection.length > 1 ? splits : 1,
-    );
-    const minutes = await chooseDuration('New quiz', false, sizes.length);
+    if (!validSplit(questions.length, splits))
+      throw new Error(`Choose between 1 and ${questions.length} quizzes.`);
+    const minutes = await chooseDuration('New quiz', false, splits);
     if (minutes === null) return;
     const id = 'bank-' + uid(),
       combined: Bank = { version: 1, id, kind: 'general', questions, study, warnings: [] };
     await saveBank(combined);
-    let offset = 0;
-    const generated = sizes.map((size, i) => {
-      const q = questions.slice(offset, offset + size);
-      offset += size;
-      return {
-        id: uid(),
+    const generated = createExamSet(
+      {
         folderId: folder.id,
         attachmentId: bookmarkSource
           ? 'bookmarks'
@@ -241,22 +277,16 @@ export function StudyFolder({
             ? selection[0]
             : 'combined',
         bankId: id,
-        name:
-          (bookmarkSource
-            ? 'Bookmarks'
-            : selection.length > 1
-              ? `Combined · ${selection.length} PDFs`
-              : (files.find((f) => f.id === selection[0])?.name ?? 'Quiz')) +
-          (sizes.length > 1 ? ` · ${i + 1}/${sizes.length}` : ''),
-        questionIds: q.map((q) => q.id),
-        createdAt: Date.now(),
-        source: bookmarkSource
-          ? ('bookmarks' as const)
+        name: bookmarkSource
+          ? 'Bookmarks'
           : selection.length > 1
-            ? ('combined' as const)
-            : ('pdf' as const),
-      };
-    });
+            ? `Combined · ${selection.length} PDFs`
+            : (files.find((f) => f.id === selection[0])?.name ?? 'Quiz'),
+        source: bookmarkSource ? 'bookmarks' : selection.length > 1 ? 'combined' : 'pdf',
+      },
+      questions,
+      splits,
+    );
     await commit((s) => ({
       ...s,
       monty: {
@@ -695,110 +725,121 @@ export function StudyFolder({
                 </button>
               )}
             </div>
-            {!math && (
-              <>
-                <section className="panel quiz-setup">
-                  <h2>New test</h2>
-                  <div className="segmented">
-                    <button
-                      className={!bookmarkSource ? 'selected' : ''}
-                      onClick={() => setBookmarkSource(false)}
-                    >
-                      From PDFs
-                    </button>
-                    <button
-                      className={bookmarkSource ? 'selected' : ''}
-                      onClick={() => setBookmarkSource(true)}
-                    >
-                      Bookmarks
-                    </button>
+            <>
+              <section className="panel quiz-setup">
+                <h2>New test</h2>
+                <div className="segmented">
+                  <button
+                    className={!bookmarkSource ? 'selected' : ''}
+                    onClick={() => setBookmarkSource(false)}
+                  >
+                    From PDFs
+                  </button>
+                  <button
+                    className={bookmarkSource ? 'selected' : ''}
+                    onClick={() => setBookmarkSource(true)}
+                  >
+                    Bookmarks
+                  </button>
+                </div>
+                {bookmarkSource ? (
+                  <p className="muted">
+                    {quizBookmarks.length} saved items. Questions with ready options are included.
+                  </p>
+                ) : (
+                  <div className="pdf-checklist">
+                    {files
+                      .filter((f) => f.bankId)
+                      .map((f) => (
+                        <label className="pdf-check" key={f.id}>
+                          <input
+                            type="checkbox"
+                            checked={selection.includes(f.id)}
+                            onChange={(e) =>
+                              setSelection((s) =>
+                                e.target.checked ? [...s, f.id] : s.filter((id) => id !== f.id),
+                              )
+                            }
+                          />
+                          <span>
+                            {f.name}
+                            <small>{f.count} questions</small>
+                          </span>
+                        </label>
+                      ))}
                   </div>
-                  {bookmarkSource ? (
-                    <p className="muted">
-                      {(w.bookmarks[folder.id] ?? []).length} saved items. Questions with ready
-                      options are included.
-                    </p>
-                  ) : (
-                    <div className="pdf-checklist">
-                      {files
-                        .filter((f) => f.bankId)
-                        .map((f) => (
-                          <label className="pdf-check" key={f.id}>
-                            <input
-                              type="checkbox"
-                              checked={selection.includes(f.id)}
-                              onChange={(e) =>
-                                setSelection((s) =>
-                                  e.target.checked ? [...s, f.id] : s.filter((id) => id !== f.id),
-                                )
-                              }
-                            />
-                            <span>
-                              {f.name}
-                              <small>{f.count} questions</small>
-                            </span>
-                          </label>
-                        ))}
-                    </div>
-                  )}
-                  <label className="field-label">Number of questions</label>
-                  <div className="segmented counts">
-                    {['10', '20', '0'].map((n) => (
-                      <button
-                        key={n}
-                        className={!custom && count === n ? 'selected' : ''}
-                        onClick={() => {
-                          setCustom(false);
-                          setCount(n);
-                        }}
-                      >
-                        {n === '0' ? 'All' : n}
-                      </button>
-                    ))}
+                )}
+                <label className="field-label">Number of questions</label>
+                <div className="segmented counts">
+                  {['10', '20', '0'].map((n) => (
                     <button
-                      className={custom ? 'selected' : ''}
+                      key={n}
+                      className={!custom && count === n ? 'selected' : ''}
                       onClick={() => {
-                        setCustom(true);
-                        setCount('');
+                        setCustom(false);
+                        setCount(n);
                       }}
                     >
-                      Custom
+                      {n === '0' ? 'All' : n}
                     </button>
-                  </div>
-                  {custom && (
-                    <label className="field">
-                      Custom questions
-                      <input
-                        type="number"
-                        min={1}
-                        step={1}
-                        value={count}
-                        onChange={(e) => setCount(e.target.value)}
-                      />
-                    </label>
-                  )}
-                  {!bookmarkSource && selection.length > 1 && (
-                    <label className="field">
-                      Split tests
-                      <select value={splits} onChange={(e) => setSplits(Number(e.target.value))}>
-                        {[1, 2, 3, 4, 5].map((n) => (
-                          <option key={n} value={n}>
-                            {n === 1 ? 'One combined test' : n + ' tests'}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                  )}
-                  <p className="muted">Choose your timer before starting · 15 minutes by default</p>
-                  <button className="primary full" onClick={() => void act(generate)}>
-                    Generate & start
+                  ))}
+                  <button
+                    className={custom ? 'selected' : ''}
+                    onClick={() => {
+                      setCustom(true);
+                      setCount('');
+                    }}
+                  >
+                    Custom
                   </button>
-                </section>
+                </div>
+                {custom && (
+                  <label className="field">
+                    Custom questions
+                    <input
+                      type="number"
+                      min={1}
+                      step={1}
+                      value={count}
+                      onChange={(e) => setCount(e.target.value)}
+                    />
+                  </label>
+                )}
+                <p className="muted selection-total" role="status">
+                  {readyQuizSource
+                    ? `${availableQuestions} unique questions available · ${selectedQuestionCount} selected`
+                    : 'Loading selected questions…'}
+                </p>
+                {readyQuizSource?.error && (
+                  <p className="notice danger" role="alert">
+                    {readyQuizSource.error}
+                  </p>
+                )}
+                <QuizSplitControls
+                  total={selectedQuestionCount}
+                  parts={splits}
+                  onChange={setSplits}
+                />
+                <p className="muted">Choose your timer before starting · 15 minutes by default</p>
+                <button
+                  className="primary full"
+                  disabled={
+                    !readyQuizSource ||
+                    !!readyQuizSource.error ||
+                    !validQuestionCount ||
+                    !validParts
+                  }
+                  onClick={() => void act(generate)}
+                >
+                  {splits > 1 ? `Create ${splits} tests & start` : 'Generate & start'}
+                </button>
+              </section>
+              {!math && (
                 <div className="saved-tests">
                   {tests.filter((t) => t.draft || !t.latest).map(testCard)}
                 </div>
-              </>
-            )}
+              )}
+            </>
             {math && (
               <>
                 {files.map((file) => {
@@ -807,7 +848,7 @@ export function StudyFolder({
                     <section key={file.id} className="pdf-test-group">
                       <h2>{file.name}</h2>
                       <p className="muted">
-                        {group.length} separate tests · up to 25 questions each
+                        {group.length} saved tests · create your own split above
                       </p>
                       {group.map(testCard)}
                       {!group.length && (

@@ -79,7 +79,7 @@ it('splits 40 and 49 questions into balanced separate tests with no repetition',
   expect(parts.map((t) => t.questions.length)).toEqual([10, 10, 10, 10, 9]);
   expect(new Set(parts.flatMap((t) => t.questions.map((q) => q.entry.id))).size).toBe(49);
   expect(new Set(parts.map((t) => t.id)).size).toBe(5);
-  expect(() => splitSizes(49, 6)).toThrow();
+  expect(splitSizes(49, 6)).toEqual([8, 8, 8, 8, 8, 9]);
   expect(() => splitSizes(3, 5)).toThrow();
 });
 it('uses exact custom counts and never repeats the same sense across PDFs', () => {

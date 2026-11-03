@@ -1,6 +1,32 @@
-import type { Exam, Bank, AttemptClock } from '../../shared/monty';
+import type { Exam, Bank, AttemptClock, MCQ } from '../../shared/monty';
 import { freshClock, DEFAULT_DURATION_MS } from '../../shared/monty';
 import { uid } from '../../shared/types';
+import { splitItems } from './quiz';
+
+export function uniqueExamQuestions(questions: MCQ[]): MCQ[] {
+  const seen = new Set<string>();
+  return questions.filter((q) => {
+    const key = (q.stem + '|' + q.passage + '|' + q.options.map((o) => o.text).join('|'))
+      .toLowerCase()
+      .replace(/\s+/g, ' ');
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+export function createExamSet(
+  source: Pick<Exam, 'folderId' | 'attachmentId' | 'bankId' | 'name' | 'source'>,
+  questions: MCQ[],
+  parts: number,
+): Exam[] {
+  return splitItems(questions, parts).map((group, i) => ({
+    ...source,
+    id: uid(),
+    name: source.name + (parts > 1 ? ` · ${i + 1}/${parts}` : ''),
+    questionIds: group.map((q) => q.id),
+    createdAt: Date.now(),
+  }));
+}
 export function mathsTests(
   bank: Bank,
   folderId: string,

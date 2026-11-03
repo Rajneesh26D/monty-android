@@ -61,15 +61,18 @@ export function createTest(
       })),
   };
 }
+export function validSplit(total: number, parts: number): boolean {
+  return (
+    Number.isSafeInteger(total) &&
+    total > 0 &&
+    Number.isSafeInteger(parts) &&
+    parts >= 1 &&
+    parts <= total
+  );
+}
 export function splitSizes(total: number, parts: number): number[] {
-  if (
-    !Number.isInteger(parts) ||
-    parts < 1 ||
-    parts > 5 ||
-    !Number.isInteger(total) ||
-    total < parts
-  )
-    throw new Error('Choose 1–5 tests, with at least one question in each.');
+  if (!validSplit(total, parts))
+    throw new Error('Choose a whole number of quizzes, with at least one question in each.');
   const base = Math.floor(total / parts),
     extra = total % parts;
   return Array.from(
@@ -77,12 +80,16 @@ export function splitSizes(total: number, parts: number): number[] {
     (_, i) => base + (extra && (extra / parts >= 0.5 ? i < extra : i >= parts - extra) ? 1 : 0),
   );
 }
-export function splitTest(test: QuizTest, parts: number): QuizTest[] {
-  const sizes = splitSizes(test.questions.length, parts);
+export function splitItems<T>(items: T[], parts: number): T[][] {
   let offset = 0;
-  return sizes.map((size, i) => {
-    const questions = test.questions.slice(offset, offset + size);
+  return splitSizes(items.length, parts).map((size) => {
+    const group = items.slice(offset, offset + size);
     offset += size;
+    return group;
+  });
+}
+export function splitTest(test: QuizTest, parts: number): QuizTest[] {
+  return splitItems(test.questions, parts).map((questions, i) => {
     return {
       ...test,
       id: uid(),

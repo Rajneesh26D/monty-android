@@ -1,3 +1,4 @@
+import { QuizSplitControls } from './components/QuizSplitControls';
 import { useTestDuration } from './components/TestDuration';
 import { StudyNavigator } from './components/StudyNavigator';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
@@ -39,7 +40,7 @@ import {
   finishAttempt,
   shuffle,
   quizPool,
-  splitSizes,
+  validSplit,
   splitTest,
 } from './core/quiz';
 import { WordCard, BookmarkButton } from './components/WordCard';
@@ -249,7 +250,9 @@ export default function App({
         Number(customCount) > quizPool(entries).length)
     )
       throw new Error(`Choose between 1 and ${quizPool(entries).length} questions.`);
-    const parts = !bookmarkSource && docs.length > 1 ? splits : 1;
+    const parts = splits;
+    if (!validSplit(test.questions.length, parts))
+      throw new Error(`Choose between 1 and ${test.questions.length} quizzes.`);
     const minutes = await chooseDuration(test.name, false, parts);
     if (minutes === null) return;
     const generated = (parts > 1 ? splitTest(test, parts) : [test]).map((t, i) =>
@@ -349,14 +352,14 @@ export default function App({
   );
   const requested = useCustom ? Number(customCount) : count;
   const total = Math.min(requested || available.length, available.length);
-  const splitCount = !bookmarkSource && selectedDocs.length > 1 ? splits : 1;
+  const splitCount = splits;
   const validCount =
     !useCustom ||
     (!!customCount &&
       Number.isInteger(requested) &&
       requested >= 1 &&
       requested <= available.length);
-  const sizes = total >= splitCount ? splitSizes(total, splitCount) : [];
+  const validParts = validSplit(total, splitCount);
   const notify = (message: string) => setToast(message);
   const testCard = (test: QuizTest) => (
     <article className="test-card" key={test.id}>
@@ -989,31 +992,14 @@ export default function App({
                 <p className="muted selection-total">
                   {available.length} unique words available · {validCount ? total : 0} selected
                 </p>
-                {!bookmarkSource && selectedDocs.length > 1 && (
-                  <label className="field">
-                    Split into separate tests
-                    <select
-                      aria-label="Split tests"
-                      value={splits}
-                      onChange={(e) => setSplits(Number(e.target.value))}
-                    >
-                      <option value={1}>One combined test</option>
-                      {[2, 3, 4, 5].map((n) => (
-                        <option key={n} value={n} disabled={total < n}>
-                          {n} tests
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                )}
-                {splitCount > 1 && sizes.length > 0 && (
-                  <p className="split-preview">
-                    {sizes.join(' + ')} questions · {splitCount} separate results
-                  </p>
-                )}
+                <QuizSplitControls
+                  total={validCount ? total : 0}
+                  parts={splits}
+                  onChange={setSplits}
+                />
                 <button
                   className="primary full"
-                  disabled={!available.length || !validCount || total < splitCount}
+                  disabled={!available.length || !validCount || !validParts}
                   onClick={() => void act(generate)}
                 >
                   {splitCount > 1 ? `Create ${splitCount} tests & start` : 'Generate & start'}{' '}
