@@ -30,7 +30,7 @@ monty_installer_result=0
 if ! python3 scripts/confirm-android-installer.py "$RUNNER_TEMP/installer-before.txt"; then
   monty_installer_result=1
   adb shell am force-stop com.monty.study
-  adb logcat -d -t 1500 | rg 'ActivityTaskManager|PackageInstaller|FileProvider|AndroidRuntime' || true
+  adb logcat -d -t 1500 | grep -E 'ActivityTaskManager|PackageInstaller|FileProvider|AndroidRuntime' || true
 fi
 # Replacement intentionally kills the instrumentation process. The ready marker,
 # system Install button, changed package timestamp and retained data together

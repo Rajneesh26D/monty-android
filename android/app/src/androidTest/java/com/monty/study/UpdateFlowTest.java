@@ -59,6 +59,12 @@ public class UpdateFlowTest {
         for(int i=0;i<node.getChildCount();i++){AccessibilityNodeInfo found=installButton(node.getChild(i));if(found!=null)return found;}
         return null;
     }
+    private AccessibilityNodeInfo installationSwitch(AccessibilityNodeInfo node){
+        if(node==null)return null;
+        if(String.valueOf(node.getPackageName()).contains("settings")&&node.isCheckable()&&node.isEnabled()&&!node.isChecked())return node;
+        for(int i=0;i<node.getChildCount();i++){AccessibilityNodeInfo found=installationSwitch(node.getChild(i));if(found!=null)return found;}
+        return null;
+    }
     @Test public void openInstallerFromForegroundActivity()throws Exception {
         Context c=context();
         File directory=new File(c.getCacheDir(),"updates");assertTrue(directory.isDirectory()||directory.mkdirs());
@@ -98,20 +104,36 @@ public class UpdateFlowTest {
             if(!settingsOpened)Thread.sleep(100);
         }
         assertTrue("The update activity must own the unknown-sources permission step",settingsOpened);
-        try(InputStream in=new ParcelFileDescriptor.AutoCloseInputStream(instrumentation.getUiAutomation().executeShellCommand("appops set com.monty.study REQUEST_INSTALL_PACKAGES allow"))){while(in.read()!=-1){}}
-        assertTrue(c.getPackageManager().canRequestPackageInstalls());
-        try(InputStream in=new ParcelFileDescriptor.AutoCloseInputStream(instrumentation.getUiAutomation().executeShellCommand("input keyevent KEYCODE_BACK"))){while(in.read()!=-1){}}
+        // Grant through the same Settings switch a phone user sees. Mutating
+        // appops externally races Settings' own permission observer and return.
+        AccessibilityNodeInfo toggle=installationSwitch(instrumentation.getUiAutomation().getRootInActiveWindow());
+        assertNotNull("Android settings must expose the allow-installation switch",toggle);
+        while(toggle!=null&&!toggle.isClickable())toggle=toggle.getParent();
+        assertNotNull("The allow-installation preference must be clickable",toggle);
+        assertTrue("Android settings must accept the permission change",toggle.performAction(AccessibilityNodeInfo.ACTION_CLICK));
+        long grantedDeadline=android.os.SystemClock.uptimeMillis()+10000;
+        while(!c.getPackageManager().canRequestPackageInstalls()&&android.os.SystemClock.uptimeMillis()<grantedDeadline)Thread.sleep(100);
+        assertTrue("Android must grant unknown-source installation",c.getPackageManager().canRequestPackageInstalls());
+        instrumentation.waitForIdleSync();
+        // Some Settings builds return automatically; never send a second Back
+        // event that could close the updater while verification is in flight.
+        AccessibilityNodeInfo permissionRoot=instrumentation.getUiAutomation().getRootInActiveWindow();
+        if(permissionRoot!=null&&String.valueOf(permissionRoot.getPackageName()).contains("settings")){
+            try(InputStream in=new ParcelFileDescriptor.AutoCloseInputStream(instrumentation.getUiAutomation().executeShellCommand("input keyevent KEYCODE_BACK"))){while(in.read()!=-1){}}
+        }
 
         // Use this instrumentation's accessibility connection for the real
         // installer UI; a second shell UIAutomator connection would conflict.
         AccessibilityNodeInfo button=null;
-        long until=android.os.SystemClock.uptimeMillis()+20000;
+        long until=android.os.SystemClock.uptimeMillis()+45000;
         while(button==null && android.os.SystemClock.uptimeMillis()<until){
             button=installButton(instrumentation.getUiAutomation().getRootInActiveWindow());
+            assertFalse("Native updater failed: "+UpdateService.prefs(c).getString("installMessage",""),"error".equals(UpdateService.prefs(c).getString("updateStage","")));
             if(button==null)Thread.sleep(100);
         }
         assertTrue("The native update activity must own the download flow",activityStarted.get());
-        assertNotNull("Monty must open Android's real Install/Update confirmation",button);
+        AccessibilityNodeInfo finalRoot=instrumentation.getUiAutomation().getRootInActiveWindow();
+        assertNotNull("Monty must open Android's real Install/Update confirmation; stage="+UpdateService.prefs(c).getString("updateStage","")+" message="+UpdateService.prefs(c).getString("installMessage","")+" foreground="+(finalRoot==null?"none":String.valueOf(finalRoot.getPackageName())),button);
         Bundle ready=new Bundle();ready.putString("stream","\nMONTY_INSTALLER_READY: "+button.getPackageName()+" / "+button.getText()+"\n");
         instrumentation.sendStatus(0,ready);
         assertTrue("Android installer button must accept confirmation",button.performAction(AccessibilityNodeInfo.ACTION_CLICK));
