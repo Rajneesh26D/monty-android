@@ -106,7 +106,14 @@ public class UpdateFlowTest {
         assertTrue("The update activity must own the unknown-sources permission step",settingsOpened);
         // Grant through the same Settings switch a phone user sees. Mutating
         // appops externally races Settings' own permission observer and return.
-        AccessibilityNodeInfo toggle=installationSwitch(instrumentation.getUiAutomation().getRootInActiveWindow());
+        AccessibilityNodeInfo toggle=null;
+        long switchDeadline=android.os.SystemClock.uptimeMillis()+15000;
+        // The Settings window becomes active before its preference tree has
+        // finished rendering on a cold emulator. Wait for the actual control.
+        while(toggle==null&&android.os.SystemClock.uptimeMillis()<switchDeadline){
+            toggle=installationSwitch(instrumentation.getUiAutomation().getRootInActiveWindow());
+            if(toggle==null)Thread.sleep(100);
+        }
         assertNotNull("Android settings must expose the allow-installation switch",toggle);
         while(toggle!=null&&!toggle.isClickable())toggle=toggle.getParent();
         assertNotNull("The allow-installation preference must be clickable",toggle);
