@@ -1,5 +1,7 @@
+import { QuizOrderControls } from './QuizOrderControls';
+import { defaultQuizCustomization, type QuizCustomization } from '../../shared/quiz-customization';
 import { QuizSplitControls } from './QuizSplitControls';
-import { useTestDuration } from './TestDuration';
+import { useTestSetup } from './TestDuration';
 import { StudyNavigator } from './StudyNavigator';
 import { PdfCard } from './PdfCard';
 import { StudyContent } from './StudyContent';
@@ -27,7 +29,7 @@ import type { Commit } from '../services/importer';
 import { addPractice, importPractice, readBank, saveBank } from '../services/workspace';
 import { removeAttachment } from '../storage/repository';
 import { startExam, mathsTests, time, uniqueExamQuestions, createExamSet } from '../core/exams';
-import { shuffle, validSplit } from '../core/quiz';
+import { validQuizSplit, quizSplitSizes, selectQuestions } from '../core/quiz';
 import { NotesPanel } from './NotesPanel';
 import { openPdfInApp } from '../services/openPdf';
 import { MCQView } from './MCQView';
@@ -54,7 +56,9 @@ export function StudyFolder({
   onBack: () => void;
   onHome: () => void;
 }) {
-  const { chooseDuration, timerDialog } = useTestDuration();
+  const { chooseSetup, timerDialog } = useTestSetup();
+  const [customization, setCustomization] = useState<QuizCustomization>(defaultQuizCustomization);
+  const [perQuiz, setPerQuiz] = useState<number | null>(null);
   const [tab, setTab] = useState<Tab>('practice'),
     [bank, setBank] = useState<Bank | null>(null),
     [selectedPdf, setSelectedPdf] = useState<string | null>(null),
@@ -159,9 +163,10 @@ export function StudyFolder({
         : s;
     });
   async function start(t: Exam) {
-    const minutes = await chooseDuration(t.name, !!t.latest);
-    if (minutes === null) return;
-    await patchTest(t.id, (test) => startExam(test, minutes));
+    const sourceBank = await readBank(t.bankId);
+    const setup = await chooseSetup(t.name, !!t.latest, 1, t.customization);
+    if (setup === null) return;
+    await patchTest(t.id, (test) => startExam(test, setup.minutes, setup, sourceBank));
     setActiveId(t.id);
     setResultId(null);
     setSelectedPdf(null);
@@ -250,7 +255,8 @@ export function StudyFolder({
   const selectedQuestionCount = validQuestionCount
     ? Math.min(requestedQuestions || availableQuestions, availableQuestions)
     : 0;
-  const validParts = validSplit(selectedQuestionCount, splits);
+  const validParts = validQuizSplit(selectedQuestionCount, splits, perQuiz);
+  const splitCount = validParts ? quizSplitSizes(selectedQuestionCount, splits, perQuiz).length : 0;
   async function generate() {
     if (!readyQuizSource) throw new Error('Wait for the selected questions to load.');
     if (readyQuizSource.error) throw new Error(readyQuizSource.error);
@@ -260,11 +266,11 @@ export function StudyFolder({
     if (!questions.length) throw new Error('Select PDFs or bookmarks with ready questions.');
     if (!Number.isInteger(n) || n < 0 || (custom && (n < 1 || n > questions.length)))
       throw new Error(`Choose 1–${questions.length} questions, or All.`);
-    questions = shuffle(questions).slice(0, n || questions.length);
-    if (!validSplit(questions.length, splits))
+    questions = selectQuestions(questions, n);
+    if (!validQuizSplit(questions.length, splits, perQuiz))
       throw new Error(`Choose between 1 and ${questions.length} quizzes.`);
-    const minutes = await chooseDuration('New quiz', false, splits);
-    if (minutes === null) return;
+    const setup = await chooseSetup('New quiz', false, splitCount, customization);
+    if (setup === null) return;
     const id = 'bank-' + uid(),
       combined: Bank = { version: 1, id, kind: 'general', questions, study, warnings: [] };
     await saveBank(combined);
@@ -286,6 +292,8 @@ export function StudyFolder({
       },
       questions,
       splits,
+      perQuiz,
+      customization,
     );
     await commit((s) => ({
       ...s,
@@ -298,7 +306,10 @@ export function StudyFolder({
         tests: {
           ...s.monty!.tests,
           ...Object.fromEntries(
-            generated.map((t, i) => [t.id, i === 0 ? startExam(t, minutes) : t]),
+            generated.map((t, i) => [
+              t.id,
+              i === 0 ? startExam(t, setup.minutes, setup, combined) : t,
+            ]),
           ),
         },
       },
@@ -472,7 +483,7 @@ export function StudyFolder({
         </button>
         <div className="timing-list">
           <h2>Time per question</h2>
-          {result.questionIds.map((id, i) => (
+          {(result.latest.questionOrder ?? result.questionIds).map((id, i) => (
             <button
               key={id}
               onClick={() => {
@@ -769,7 +780,7 @@ export function StudyFolder({
                       ))}
                   </div>
                 )}
-                <label className="field-label">Number of questions</label>
+                <label className="field-label">Total questions to use</label>
                 <div className="segmented counts">
                   {['10', '20', '0'].map((n) => (
                     <button
@@ -815,10 +826,13 @@ export function StudyFolder({
                     {readyQuizSource.error}
                   </p>
                 )}
+                <QuizOrderControls value={customization} onChange={setCustomization} />
                 <QuizSplitControls
                   total={selectedQuestionCount}
                   parts={splits}
                   onChange={setSplits}
+                  perQuiz={perQuiz}
+                  onPerQuizChange={setPerQuiz}
                 />
                 <p className="muted">Choose your timer before starting · 15 minutes by default</p>
                 <button
@@ -831,7 +845,7 @@ export function StudyFolder({
                   }
                   onClick={() => void act(generate)}
                 >
-                  {splits > 1 ? `Create ${splits} tests & start` : 'Generate & start'}
+                  {splitCount > 1 ? `Create ${splitCount} tests & start` : 'Generate & start'}
                 </button>
               </section>
               {!math && (

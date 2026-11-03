@@ -1,4 +1,5 @@
 import { workspaceSchema, clockSchema } from './monty';
+import { attemptOrderFields, quizCustomizationSchema } from './quiz-customization';
 import { z } from 'zod';
 import { relationSchema } from './validation';
 const entry = z.object({
@@ -36,9 +37,11 @@ const quiz = z.object({
   source: z.enum(['pdf', 'combined', 'bookmarks']),
   sourceNames: z.array(z.string()),
   questions: z.array(question).min(1),
+  customization: quizCustomizationSchema.optional(),
   latest: z
     .object({
       completedAt: z.number(),
+      ...attemptOrderFields,
       spent: z.record(z.string(), z.number()).optional(),
       elapsedMs: z.number().optional(),
       wrong: z.number().optional(),
@@ -52,6 +55,7 @@ const quiz = z.object({
     .object({
       answers,
       visited: z.array(z.string()).optional(),
+      ...attemptOrderFields,
       marked: z.array(z.string()).optional(),
       index: z.number().int().nonnegative(),
       startedAt: z.number(),

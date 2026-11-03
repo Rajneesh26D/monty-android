@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { attemptOrderFields, quizCustomizationSchema } from './quiz-customization';
 export type Area = 'maths' | 'vocab' | 'grammar' | 'reading';
 export const folderSchema = z.object({
   id: z.string(),
@@ -103,10 +104,12 @@ export const examSchema = z.object({
   name: z.string(),
   source: z.enum(['pdf', 'combined', 'bookmarks']).default('pdf'),
   questionIds: z.array(z.string()).min(1),
+  customization: quizCustomizationSchema.optional(),
   createdAt: z.number(),
   draft: z
     .object({
       id: z.string(),
+      ...attemptOrderFields,
       index: z.number().int().nonnegative(),
       answers: choices,
       visited: z.array(z.string()).optional(),
@@ -118,6 +121,7 @@ export const examSchema = z.object({
   latest: z
     .object({
       completedAt: z.number(),
+      ...attemptOrderFields,
       answers: choices,
       correct: z.number(),
       wrong: z.number(),

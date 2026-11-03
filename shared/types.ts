@@ -1,4 +1,5 @@
 import type { Workspace, AttemptClock } from './monty';
+import type { AttemptOrder, QuizCustomization } from './quiz-customization';
 export type Origin = 'pdf' | 'ai' | 'edited';
 export type Kind = 'syn' | 'ant';
 export interface Relation {
@@ -48,7 +49,7 @@ export interface Question {
   options: Option[];
 }
 export type Answers = Record<string, Record<string, Kind>>;
-export interface Result {
+export interface Result extends AttemptOrder {
   spent?: Record<string, number>;
   elapsedMs?: number;
   wrong?: number;
@@ -58,7 +59,7 @@ export interface Result {
   total: number;
   answers: Answers;
 }
-export interface Draft {
+export interface Draft extends AttemptOrder {
   visited?: string[];
   marked?: string[];
   id?: string;
@@ -68,6 +69,7 @@ export interface Draft {
   startedAt: number;
 }
 export interface QuizTest {
+  customization?: QuizCustomization;
   folderId?: string;
   id: string;
   name: string;

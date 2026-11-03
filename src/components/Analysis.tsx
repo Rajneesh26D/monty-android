@@ -1,3 +1,4 @@
+import { presentQuestions } from '../core/quizOrder';
 import { useEffect, useState } from 'react';
 import { ArrowLeft, ArrowRight } from 'lucide-react';
 import type { Answers, Kind, QuizTest, State, Entry } from '../../shared/types';
@@ -25,8 +26,9 @@ export function Analysis({
     setPractice({});
     setRevealed(new Set());
   }, [test.id, test.latest?.completedAt]);
+  const questions = presentQuestions(test.questions, test.latest);
   const hide = state.settings.hideReviewAnswers,
-    q = test.questions[index],
+    q = questions[index],
     show = !hide || revealed.has(q.id),
     answers = hide ? practice[q.id] || {} : test.latest?.answers[q.id] || {};
   const selected = q.options.every((o) => answers[o.id]);
@@ -66,9 +68,9 @@ export function Analysis({
             value={index}
             onChange={(e) => setIndex(Number(e.target.value))}
           >
-            {test.questions.map((_, i) => (
+            {questions.map((_, i) => (
               <option key={i} value={i}>
-                {i + 1} / {test.questions.length}
+                {i + 1} / {questions.length}
               </option>
             ))}
           </select>
@@ -114,7 +116,7 @@ export function Analysis({
         </button>
         <button
           className="secondary"
-          disabled={index === test.questions.length - 1}
+          disabled={index === questions.length - 1}
           onClick={() => setIndex((i) => i + 1)}
         >
           Next <ArrowRight size={17} />

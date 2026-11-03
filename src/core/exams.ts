@@ -2,6 +2,8 @@ import type { Exam, Bank, AttemptClock, MCQ } from '../../shared/monty';
 import { freshClock, DEFAULT_DURATION_MS } from '../../shared/monty';
 import { uid } from '../../shared/types';
 import { splitItems } from './quiz';
+import { applyOrder, createAttemptOrder, presentQuestions } from './quizOrder';
+import { defaultQuizCustomization, type QuizCustomization } from '../../shared/quiz-customization';
 
 export function uniqueExamQuestions(questions: MCQ[]): MCQ[] {
   const seen = new Set<string>();
@@ -18,11 +20,18 @@ export function createExamSet(
   source: Pick<Exam, 'folderId' | 'attachmentId' | 'bankId' | 'name' | 'source'>,
   questions: MCQ[],
   parts: number,
+  perQuiz?: number | null,
+  customization: QuizCustomization = defaultQuizCustomization,
 ): Exam[] {
-  return splitItems(questions, parts).map((group, i) => ({
+  const groups = splitItems(questions, parts, perQuiz);
+  return groups.map((group, i) => ({
     ...source,
     id: uid(),
-    name: source.name + (parts > 1 ? ` · ${i + 1}/${parts}` : ''),
+    name: source.name + (groups.length > 1 ? ` · ${i + 1}/${groups.length}` : ''),
+    customization: {
+      shuffleQuestions: customization.shuffleQuestions,
+      shuffleOptions: customization.shuffleOptions,
+    },
     questionIds: group.map((q) => q.id),
     createdAt: Date.now(),
   }));
@@ -45,14 +54,50 @@ export function mathsTests(
     source: 'pdf' as const,
   }));
 }
-export function startExam(test: Exam, minutes = 15): Exam {
+export function examQuestions(test: Exam, bank: Bank, review = false): MCQ[] {
+  const source = applyOrder(
+    bank.questions.filter((q) => test.questionIds.includes(q.id)),
+    test.questionIds,
+  );
+  const order = review ? test.latest : test.draft;
+  return presentQuestions(source, order).map((q) => {
+    const original = source.find((item) => item.id === q.id)!.options;
+    const moved = q.options.some((option, index) => option.id !== original[index]?.id);
+    return {
+      ...q,
+      options: moved
+        ? q.options.map((option, index) => ({ ...option, label: String.fromCharCode(65 + index) }))
+        : q.options,
+    };
+  });
+}
+export function startExam(
+  test: Exam,
+  minutes = 15,
+  customization: QuizCustomization = test.customization ?? defaultQuizCustomization,
+  bank?: Bank,
+): Exam {
+  if (customization.shuffleOptions && !bank)
+    throw new Error('Load the question sheet before shuffling options.');
+  const source: { id: string; options: { id: string }[] }[] = bank
+    ? applyOrder(
+        bank.questions.filter((q) => test.questionIds.includes(q.id)),
+        test.questionIds,
+      )
+    : test.questionIds.map((id) => ({ id, options: [] }));
+  const order = createAttemptOrder(source, customization);
   return {
     ...test,
+    customization: {
+      shuffleQuestions: customization.shuffleQuestions,
+      shuffleOptions: customization.shuffleOptions,
+    },
     draft: {
       id: uid(),
+      ...order,
       index: 0,
       answers: {},
-      visited: test.questionIds.slice(0, 1),
+      visited: order.questionOrder?.slice(0, 1),
       marked: [],
       clock: { ...freshClock(minutes), paused: false },
       startedAt: Date.now(),
@@ -76,6 +121,8 @@ export function finishExam(test: Exam, bank: Bank): Exam {
     draft: undefined,
     latest: {
       completedAt: Date.now(),
+      questionOrder: d.questionOrder,
+      optionOrder: d.optionOrder,
       answers: { ...d.answers },
       correct,
       wrong,

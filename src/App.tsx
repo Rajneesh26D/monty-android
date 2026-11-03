@@ -1,5 +1,7 @@
+import { QuizOrderControls } from './components/QuizOrderControls';
+import { defaultQuizCustomization, type QuizCustomization } from '../shared/quiz-customization';
 import { QuizSplitControls } from './components/QuizSplitControls';
-import { useTestDuration } from './components/TestDuration';
+import { useTestSetup } from './components/TestDuration';
 import { StudyNavigator } from './components/StudyNavigator';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { AppHeader } from './components/AppHeader';
@@ -40,7 +42,8 @@ import {
   finishAttempt,
   shuffle,
   quizPool,
-  validSplit,
+  validQuizSplit,
+  quizSplitSizes,
   splitTest,
 } from './core/quiz';
 import { WordCard, BookmarkButton } from './components/WordCard';
@@ -50,6 +53,7 @@ import { EntryEditor } from './components/EntryEditor';
 import { Settings } from './components/Settings';
 import { useAttemptClock } from './components/useAttemptClock';
 import { time } from './core/exams';
+import { presentQuestions } from './core/quizOrder';
 import type { AttemptClock } from '../shared/monty';
 import { CloudStatus } from './components/CloudStatus';
 import { PdfCard } from './components/PdfCard';
@@ -80,7 +84,9 @@ export default function App({
   onHome: () => void;
   onSettings: () => void;
 }) {
-  const { chooseDuration, timerDialog } = useTestDuration();
+  const { chooseSetup, timerDialog } = useTestSetup();
+  const [customization, setCustomization] = useState<QuizCustomization>(defaultQuizCustomization);
+  const [perQuiz, setPerQuiz] = useState<number | null>(null);
   const { state, commit, error, current } = store;
   const [tab, setTab] = useState<Tab>('library'),
     [toast, setToast] = useState(''),
@@ -214,9 +220,9 @@ export default function App({
     setSelected((ids) => ids.filter((x) => x !== id));
   }
   async function begin(test: QuizTest) {
-    const minutes = await chooseDuration(test.name, !!test.latest);
-    if (minutes === null) return;
-    const started = startAttempt(test, minutes);
+    const setup = await chooseSetup(test.name, !!test.latest, 1, test.customization);
+    if (setup === null) return;
+    const started = startAttempt(test, setup.minutes, setup);
     await commit((s) => ({ ...s, tests: s.tests.map((t) => (t.id === test.id ? started : t)) }));
     setActiveId(test.id);
     setAnalysisId(null);
@@ -241,6 +247,7 @@ export default function App({
       source,
       docs.map((d) => d.name),
       useCustom ? Number(customCount) : count,
+      customization,
     );
     if (
       useCustom &&
@@ -251,13 +258,12 @@ export default function App({
     )
       throw new Error(`Choose between 1 and ${quizPool(entries).length} questions.`);
     const parts = splits;
-    if (!validSplit(test.questions.length, parts))
+    if (!validQuizSplit(test.questions.length, parts, perQuiz))
       throw new Error(`Choose between 1 and ${test.questions.length} quizzes.`);
-    const minutes = await chooseDuration(test.name, false, parts);
-    if (minutes === null) return;
-    const generated = (parts > 1 ? splitTest(test, parts) : [test]).map((t, i) =>
-      i === 0 ? startAttempt(t, minutes) : t,
-    );
+    const groups = splitTest(test, parts, perQuiz);
+    const setup = await chooseSetup(test.name, false, groups.length, customization);
+    if (setup === null) return;
+    const generated = groups.map((t, i) => (i === 0 ? startAttempt(t, setup.minutes, setup) : t));
     await commit((s) => ({ ...s, tests: [...generated, ...s.tests] }));
     setActiveId(generated[0].id);
     setResultId(null);
@@ -291,7 +297,8 @@ export default function App({
     }));
   const timer = useAttemptClock(
     timedDraft ? (timedDraft.id ?? timed!.id) : undefined,
-    timedDraft ? timed?.questions[timedDraft.index]?.id : undefined,
+    timedDraft?.questionOrder?.[timedDraft.index] ??
+      (timedDraft ? timed?.questions[timedDraft.index]?.id : undefined),
     timedDraft?.clock,
     persistClock,
     async (clock) => {
@@ -352,14 +359,16 @@ export default function App({
   );
   const requested = useCustom ? Number(customCount) : count;
   const total = Math.min(requested || available.length, available.length);
-  const splitCount = splits;
+  const splitCount = validQuizSplit(total, splits, perQuiz)
+    ? quizSplitSizes(total, splits, perQuiz).length
+    : 0;
   const validCount =
     !useCustom ||
     (!!customCount &&
       Number.isInteger(requested) &&
       requested >= 1 &&
       requested <= available.length);
-  const validParts = validSplit(total, splitCount);
+  const validParts = validQuizSplit(total, splits, perQuiz);
   const notify = (message: string) => setToast(message);
   const testCard = (test: QuizTest) => (
     <article className="test-card" key={test.id}>
@@ -498,8 +507,14 @@ export default function App({
               test={active}
               timer={timer}
               onHome={onHome}
-              saved={state.bookmarks.includes(active.questions[active.draft!.index].entry.id)}
-              onBookmark={() => bookmark(active.questions[active.draft!.index].entry)}
+              saved={state.bookmarks.includes(
+                presentQuestions(active.questions, active.draft)[active.draft!.index].entry.id,
+              )}
+              onBookmark={() =>
+                bookmark(
+                  presentQuestions(active.questions, active.draft)[active.draft!.index].entry,
+                )
+              }
               onUpdate={(change) =>
                 act(() =>
                   commit((s) => ({
@@ -953,7 +968,7 @@ export default function App({
                     )}
                   </div>
                 )}
-                <label className="field-label">Number of words</label>
+                <label className="field-label">Total questions to use</label>
                 <div className="segmented counts">
                   {[10, 20, 0].map((n) => (
                     <button
@@ -992,10 +1007,13 @@ export default function App({
                 <p className="muted selection-total">
                   {available.length} unique words available · {validCount ? total : 0} selected
                 </p>
+                <QuizOrderControls value={customization} onChange={setCustomization} />
                 <QuizSplitControls
                   total={validCount ? total : 0}
                   parts={splits}
                   onChange={setSplits}
+                  perQuiz={perQuiz}
+                  onPerQuizChange={setPerQuiz}
                 />
                 <button
                   className="primary full"

@@ -1,14 +1,9 @@
 import { freshClock, DEFAULT_DURATION_MS } from '../../shared/monty';
 import { type Answers, type Entry, type QuizTest, type Result, uid } from '../../shared/types';
 import { canQuiz, normalize } from './vocabulary';
-export function shuffle<T>(items: T[]): T[] {
-  const a = [...items];
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [a[i], a[j]] = [a[j], a[i]];
-  }
-  return a;
-}
+export { shuffle } from './quizOrder';
+import { createAttemptOrder } from './quizOrder';
+import { defaultQuizCustomization, type QuizCustomization } from '../../shared/quiz-customization';
 export function quizPool(entries: Entry[]): Entry[] {
   const seen = new Set<string>();
   return entries.filter((e) => {
@@ -18,12 +13,18 @@ export function quizPool(entries: Entry[]): Entry[] {
     return true;
   });
 }
+export function selectQuestions<T>(items: T[], count: number): T[] {
+  if (!Number.isSafeInteger(count) || count < 0)
+    throw new Error('Enter a whole number of questions.');
+  return items.slice(0, count || items.length);
+}
 export function createTest(
   entries: Entry[],
   name: string,
   source: QuizTest['source'],
   sourceNames: string[],
   count: number,
+  customization: QuizCustomization = defaultQuizCustomization,
 ): QuizTest {
   const pool = quizPool(entries);
   if (!Number.isInteger(count) || count < 0) throw new Error('Enter a whole number of questions.');
@@ -35,30 +36,28 @@ export function createTest(
     createdAt: Date.now(),
     source,
     sourceNames,
-    questions: shuffle(pool)
-      .slice(0, count || pool.length)
-      .map((e) => ({
-        id: uid(),
-        entry: structuredClone(e),
-        options: shuffle([
-          ...shuffle(e.synonyms)
-            .slice(0, 3)
-            .map((r) => ({
-              id: uid(),
-              term: r.term,
-              explanation: r.explanation,
-              kind: 'syn' as const,
-            })),
-          ...shuffle(e.antonyms)
-            .slice(0, 3)
-            .map((r) => ({
-              id: uid(),
-              term: r.term,
-              explanation: r.explanation,
-              kind: 'ant' as const,
-            })),
-        ]),
-      })),
+    customization: {
+      shuffleQuestions: customization.shuffleQuestions,
+      shuffleOptions: customization.shuffleOptions,
+    },
+    questions: selectQuestions(pool, count).map((e) => ({
+      id: uid(),
+      entry: structuredClone(e),
+      options: [
+        ...e.synonyms.slice(0, 3).map((r) => ({
+          id: uid(),
+          term: r.term,
+          explanation: r.explanation,
+          kind: 'syn' as const,
+        })),
+        ...e.antonyms.slice(0, 3).map((r) => ({
+          id: uid(),
+          term: r.term,
+          explanation: r.explanation,
+          kind: 'ant' as const,
+        })),
+      ],
+    })),
   };
 }
 export function validSplit(total: number, parts: number): boolean {
@@ -80,32 +79,58 @@ export function splitSizes(total: number, parts: number): number[] {
     (_, i) => base + (extra && (extra / parts >= 0.5 ? i < extra : i >= parts - extra) ? 1 : 0),
   );
 }
-export function splitItems<T>(items: T[], parts: number): T[][] {
+export function validQuizSplit(total: number, parts: number, perQuiz?: number | null): boolean {
+  return perQuiz == null
+    ? validSplit(total, parts)
+    : Number.isSafeInteger(total) &&
+        total > 0 &&
+        Number.isSafeInteger(perQuiz) &&
+        perQuiz >= 1 &&
+        perQuiz <= total;
+}
+export function quizSplitSizes(total: number, parts: number, perQuiz?: number | null): number[] {
+  if (!validQuizSplit(total, parts, perQuiz))
+    throw new Error('Choose valid quiz sizes with at least one question in each.');
+  if (perQuiz == null) return splitSizes(total, parts);
+  return Array.from({ length: Math.ceil(total / perQuiz) }, (_, i) =>
+    Math.min(perQuiz, total - i * perQuiz),
+  );
+}
+export function splitItems<T>(items: T[], parts: number, perQuiz?: number | null): T[][] {
   let offset = 0;
-  return splitSizes(items.length, parts).map((size) => {
+  return quizSplitSizes(items.length, parts, perQuiz).map((size) => {
     const group = items.slice(offset, offset + size);
     offset += size;
     return group;
   });
 }
-export function splitTest(test: QuizTest, parts: number): QuizTest[] {
-  return splitItems(test.questions, parts).map((questions, i) => {
+export function splitTest(test: QuizTest, parts: number, perQuiz?: number | null): QuizTest[] {
+  const groups = splitItems(test.questions, parts, perQuiz);
+  return groups.map((questions, i) => {
     return {
       ...test,
       id: uid(),
-      name: `${test.name} · ${i + 1}/${parts}`,
+      name: groups.length > 1 ? `${test.name} · ${i + 1}/${groups.length}` : test.name,
       questions,
       latest: undefined,
       draft: undefined,
     };
   });
 }
-export function startAttempt(test: QuizTest, minutes = 15): QuizTest {
+export function startAttempt(
+  test: QuizTest,
+  minutes = 15,
+  customization: QuizCustomization = test.customization ?? defaultQuizCustomization,
+): QuizTest {
   return {
     ...test,
-    questions: shuffle(test.questions).map((q) => ({ ...q, options: shuffle(q.options) })),
+    customization: {
+      shuffleQuestions: customization.shuffleQuestions,
+      shuffleOptions: customization.shuffleOptions,
+    },
     draft: {
       id: uid(),
+      ...createAttemptOrder(test.questions, customization),
       clock: { ...freshClock(minutes), paused: false },
       index: 0,
       answers: {},
@@ -122,6 +147,8 @@ export function grade(test: QuizTest, answers: Answers, allowPartial = false): R
     throw new Error('Choose a classification for every option before finishing.');
   return {
     completedAt: Date.now(),
+    questionOrder: test.draft?.questionOrder,
+    optionOrder: test.draft?.optionOrder,
     score: test.questions.filter((q) => q.options.every((o) => answers[q.id]?.[o.id] === o.kind))
       .length,
     wrong: test.questions.filter(

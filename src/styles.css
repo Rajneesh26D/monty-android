@@ -2073,3 +2073,27 @@ progress::-moz-progress-bar {
   display: block;
   color: var(--muted);
 }
+
+.quiz-order-controls {
+  margin: 16px 0;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  min-width: 0;
+}
+.quiz-order-controls legend {
+  padding: 0 6px;
+  font-size: 13px;
+  font-weight: 650;
+}
+.quiz-order-controls label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.quiz-order-controls p {
+  margin-top: 8px;
+}

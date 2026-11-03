@@ -1,18 +1,22 @@
+import { QuizOrderControls } from './QuizOrderControls';
+import { defaultQuizCustomization, type QuizCustomization } from '../../shared/quiz-customization';
+export type TestSetup = QuizCustomization & { minutes: number };
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Clock3, X } from 'lucide-react';
 import { DEFAULT_TIMER_MINUTES, MAX_TIMER_MINUTES } from '../../shared/monty';
 
-export function useTestDuration() {
+export function useTestSetup() {
   const [request, setRequest] = useState<{
     name: string;
     reattempt: boolean;
     count: number;
   } | null>(null);
   const [minutes, setMinutes] = useState(String(DEFAULT_TIMER_MINUTES));
-  const resolver = useRef<((value: number | null) => void) | null>(null);
+  const [customization, setCustomization] = useState<QuizCustomization>(defaultQuizCustomization);
+  const resolver = useRef<((value: TestSetup | null) => void) | null>(null);
   const dialog = useRef<HTMLDialogElement>(null);
-  function close(value: number | null) {
+  function close(value: TestSetup | null) {
     resolver.current?.(value);
     resolver.current = null;
     setRequest(null);
@@ -26,9 +30,15 @@ export function useTestDuration() {
     },
     [],
   );
-  function chooseDuration(name: string, reattempt = false, count = 1): Promise<number | null> {
+  function chooseSetup(
+    name: string,
+    reattempt = false,
+    count = 1,
+    initial: QuizCustomization = defaultQuizCustomization,
+  ): Promise<TestSetup | null> {
     resolver.current?.(null);
     setMinutes(String(DEFAULT_TIMER_MINUTES));
+    setCustomization({ ...initial });
     setRequest({ name, reattempt, count });
     return new Promise((resolve) => {
       resolver.current = resolve;
@@ -47,7 +57,8 @@ export function useTestDuration() {
           onSubmit={(event) => {
             event.preventDefault();
             const value = Number(minutes);
-            if (Number.isInteger(value) && value >= 1 && value <= MAX_TIMER_MINUTES) close(value);
+            if (Number.isInteger(value) && value >= 1 && value <= MAX_TIMER_MINUTES)
+              close({ minutes: value, ...customization });
           }}
         >
           <div className="card-heading">
@@ -95,10 +106,11 @@ export function useTestDuration() {
               onChange={(event) => setMinutes(event.target.value)}
             />
           </label>
+          <QuizOrderControls value={customization} onChange={setCustomization} />
           {request.count > 1 && (
             <p className="muted">
-              The first test starts now. Choose a timer for each of the {request.count - 1}{' '}
-              remaining tests when you start it.
+              The first test starts now. Choose the timer and shuffle settings for each of the{' '}
+              {request.count - 1} remaining tests when you start it.
             </p>
           )}
           <div className="timer-dialog-actions">
@@ -113,5 +125,5 @@ export function useTestDuration() {
       </dialog>,
       document.body,
     );
-  return { chooseDuration, timerDialog };
+  return { chooseSetup, timerDialog };
 }

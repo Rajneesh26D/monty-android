@@ -1,3 +1,4 @@
+import { presentQuestions } from '../core/quizOrder';
 import type { Kind, QuizTest } from '../../shared/types';
 import type { useAttemptClock } from './useAttemptClock';
 import { Choices } from './Question';
@@ -24,9 +25,10 @@ export function VocabularyExam({
   onBookmark: () => void;
 }) {
   const draft = test.draft!,
-    q = test.questions[draft.index],
+    questions = presentQuestions(test.questions, draft),
+    q = questions[draft.index],
     answers = draft.answers[q.id] ?? {};
-  const ids = test.questions.map((q) => q.id);
+  const ids = questions.map((q) => q.id);
   const answered = (id: string) =>
     test.questions.find((q) => q.id === id)!.options.every((o) => !!draft.answers[id]?.[o.id]);
   const change = (fn: (d: NonNullable<QuizTest['draft']>) => NonNullable<QuizTest['draft']>) =>

@@ -1,5 +1,5 @@
 {
-  "versionCode": 20112,
-  "versionName": "2.1.12",
-  "notes": "Split questions into multiple quizzes in Maths, Grammar, Vocabulary, Idioms and reading sections. The same split controls now work for a single PDF, multiple PDFs and bookmarks, with question-count previews and custom numbers of quizzes beyond five. Each quiz keeps its own timer and result; existing tests and progress remain intact."
+  "versionCode": 20113,
+  "versionName": "2.1.13",
+  "notes": "Preserve sheet question and option order by default. Add independent question and option shuffle settings for each test and reattempt, alongside its custom timer. Divide sheets by the number of quizzes or exact questions per quiz, including 60 questions into four consecutive tests of 15. Saved attempts and results retain their chosen order across resume and sync."
 }

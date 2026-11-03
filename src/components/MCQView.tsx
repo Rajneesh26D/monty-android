@@ -57,6 +57,11 @@ export function MCQView({
             <RichText text={display(question.passage)} />
           </div>
         )}
+        {exam && (
+          <p className="muted">
+            Sheet question {question.number} · page {question.page}
+          </p>
+        )}
         <h2 className="question-stem">
           <RichText text={display(question.stem)} />
         </h2>

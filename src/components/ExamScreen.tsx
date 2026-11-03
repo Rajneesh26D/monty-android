@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { ArrowLeft, Bookmark } from 'lucide-react';
 import type { Bank, Exam, AttemptClock, MCQ } from '../../shared/monty';
-import { finishExam, time } from '../core/exams';
+import { finishExam, time, examQuestions } from '../core/exams';
 import { useAttemptClock } from './useAttemptClock';
 import { MCQView } from './MCQView';
 import { ComputerExam } from './ComputerExam';
@@ -26,7 +26,8 @@ export function ExamScreen({
   onBookmark: (q: MCQ) => void;
 }) {
   const draft = test.draft!,
-    question = bank.questions.find((q) => q.id === test.questionIds[draft.index])!;
+    questions = examQuestions(test, bank),
+    question = questions[draft.index];
   const persist = async (clock: AttemptClock) =>
     onUpdate((t) => (t.draft?.id === draft.id ? { ...t, draft: { ...t.draft, clock } } : t));
   const finish = async (clock: AttemptClock) => {
@@ -42,7 +43,7 @@ export function ExamScreen({
         ? { ...t, draft: fn({ ...t.draft, clock: { ...timer.capture()! } }) }
         : t,
     );
-  const ids = test.questionIds;
+  const ids = questions.map((q) => q.id);
   const navigate = async (action: 'jump' | 'save-next' | 'review-next', index?: number) => {
     await change((d) => navigateAttempt(d, ids, action, index));
   };
@@ -112,7 +113,8 @@ export function ExamAnalysis({
   const [index, setIndex] = useState(initialIndex),
     [answers, setAnswers] = useState<Record<string, string>>({}),
     [revealed, setRevealed] = useState<Record<string, boolean>>({});
-  const q = bank.questions.find((q) => q.id === test.questionIds[index])!,
+  const questions = examQuestions(test, bank, true);
+  const q = questions[index],
     show = !hide || revealed[q.id];
   return (
     <>
@@ -144,13 +146,13 @@ export function ExamAnalysis({
             value={index}
             onChange={(e) => setIndex(Number(e.target.value))}
           >
-            {test.questionIds.map((id, i) => (
+            {questions.map(({ id }, i) => (
               <option key={id} value={i}>
                 {i + 1}
               </option>
             ))}
           </select>{' '}
-          / {test.questionIds.length}
+          / {questions.length}
         </label>
         <button
           className="icon-button"
@@ -186,7 +188,7 @@ export function ExamAnalysis({
         </button>
         <button
           className="secondary"
-          disabled={index === test.questionIds.length - 1}
+          disabled={index === questions.length - 1}
           onClick={() => setIndex((i) => i + 1)}
         >
           Next
