@@ -9,6 +9,7 @@ export function VocabularyExam({
   timer,
   onUpdate,
   onExit,
+  onHome,
   onSubmit,
   saved,
   onBookmark,
@@ -17,6 +18,7 @@ export function VocabularyExam({
   timer: ReturnType<typeof useAttemptClock>;
   onUpdate: (change: (test: QuizTest) => QuizTest) => Promise<unknown>;
   onExit: () => void;
+  onHome: () => void;
   onSubmit: () => Promise<unknown>;
   saved: boolean;
   onBookmark: () => void;
@@ -65,6 +67,7 @@ export function VocabularyExam({
         })
       }
       onExit={onExit}
+      onHome={onHome}
       onSubmit={onSubmit}
     >
       <div className="quiz-head">

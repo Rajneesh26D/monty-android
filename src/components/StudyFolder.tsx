@@ -1,3 +1,4 @@
+import { StudyNavigator } from './StudyNavigator';
 import { PdfCard } from './PdfCard';
 import { StudyContent } from './StudyContent';
 import { useEffect, useRef, useState } from 'react';
@@ -41,6 +42,7 @@ export function StudyFolder({
   commit,
   notify,
   onBack,
+  onHome,
 }: {
   folder: Folder;
   state: State;
@@ -48,6 +50,7 @@ export function StudyFolder({
   commit: Commit;
   notify: (s: string) => void;
   onBack: () => void;
+  onHome: () => void;
 }) {
   const [tab, setTab] = useState<Tab>('practice'),
     [bank, setBank] = useState<Bank | null>(null),
@@ -377,6 +380,7 @@ export function StudyFolder({
         bank={bank}
         onUpdate={(fn) => patchTest(active.id, fn)}
         onExit={() => setActiveId(null)}
+        onHome={onHome}
         onFinished={() => {
           setResultId(active.id);
           setActiveId(null);
@@ -503,12 +507,17 @@ export function StudyFolder({
               )}
               {studyMode && bank.study.length > 0 ? (
                 <>
+                  <StudyNavigator
+                    key={bank.id}
+                    ids={bank.study.map((item) => item.id)}
+                    onReveal={(index) => setLimit((old) => Math.max(old, index + 1))}
+                  />
                   <div className="word-grid">
                     {bank.study.slice(0, limit).map((item) => {
                       const ref = questionRef(bank.id, item.id, bank.kind !== 'idioms'),
                         saved = refs.includes(ref);
                       return (
-                        <article className="word-card" key={item.id}>
+                        <article className="word-card" data-study-id={item.id} key={item.id}>
                           <div className="card-heading">
                             <h2>{item.title}</h2>
                             <button
@@ -909,9 +918,7 @@ function PracticeQuestions({
 }) {
   const progress = state.monty!.practice[attachment.id] ?? { index: 0, answers: {}, updatedAt: 0 };
   const [index, setIndex] = useState(() =>
-    bank.kind === 'maths'
-      ? resumePractice(bank.questions, progress.answers, progress.index)
-      : Math.max(0, Math.min(progress.index, bank.questions.length - 1)),
+    resumePractice(bank.questions, progress.answers, progress.index),
   );
   const q = bank.questions[index];
   const visited = [...new Set([...(progress.visited ?? []), ...(q ? [q.id] : [])])];
@@ -938,40 +945,20 @@ function PracticeQuestions({
   };
   return (
     <>
-      {bank.kind === 'maths' && (
-        <QuestionTracker
-          practice
-          ids={bank.questions.map((q) => q.id)}
-          index={index}
-          answered={(id) =>
-            bank.questions
-              .find((q) => q.id === id)!
-              .options.some((o) => o.id === progress.answers[id])
-          }
-          visited={visited}
-          onNavigate={move}
-        />
-      )}
+      <QuestionTracker
+        practice
+        ids={bank.questions.map((q) => q.id)}
+        index={index}
+        answered={(id) =>
+          bank.questions
+            .find((q) => q.id === id)!
+            .options.some((o) => o.id === progress.answers[id])
+        }
+        visited={visited}
+        onNavigate={move}
+      />
       <div className="question-meta">
-        {bank.kind !== 'maths' ? (
-          <label>
-            Question{' '}
-            <select
-              aria-label="Practice question"
-              value={index}
-              onChange={(e) => move(Number(e.target.value))}
-            >
-              {bank.questions.map((q, i) => (
-                <option key={q.id} value={i}>
-                  {i + 1}
-                </option>
-              ))}
-            </select>{' '}
-            / {bank.questions.length}
-          </label>
-        ) : (
-          <span className="eyebrow">Practice · progress saves automatically</span>
-        )}
+        <span className="eyebrow">Practice · progress saves automatically</span>
         <button
           className="icon-button bookmark"
           aria-label={saved(q) ? 'Remove practice bookmark' : 'Bookmark practice question'}

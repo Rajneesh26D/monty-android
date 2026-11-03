@@ -1,5 +1,5 @@
 {
-  "versionCode": 20109,
-  "versionName": "2.1.9",
-  "notes": "Add a computer based exam interface with a fixed timer, section bar, colour-coded question palette, Mark for Review & Next, Clear Response, Save & Next and submission summary. Responsive layouts support phones, tablets, laptops and large desktops."
+  "versionCode": 20110,
+  "versionName": "2.1.10",
+  "notes": "Redesign the desktop workspace and mobile home screen; add clear Home navigation that preserves timed attempts; provide numbered practice palettes for English, Maths, vocabulary and study cards; place the desktop exam triangle behind the scrollbar with only its tip exposed."
 }

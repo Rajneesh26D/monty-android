@@ -10,6 +10,7 @@ import {
   Expand,
   FileText,
   Flag,
+  Home,
   LayoutGrid,
   Minimize,
   Pause,
@@ -37,6 +38,7 @@ export function ComputerExam({
   onClear,
   hasAnswer,
   onExit,
+  onHome,
   onSubmit,
   children,
 }: {
@@ -56,6 +58,7 @@ export function ComputerExam({
   onClear: () => Promise<unknown>;
   hasAnswer: boolean;
   onExit: () => void;
+  onHome: () => void;
   onSubmit: () => Promise<unknown>;
   children: ReactNode;
 }) {
@@ -206,6 +209,21 @@ export function ComputerExam({
           <span>Computer based practice test</span>
         </div>
         <div className="cbt-header-tools">
+          <button
+            className="cbt-header-button cbt-home"
+            aria-label="Home"
+            title="Save attempt and return home"
+            onClick={() =>
+              void run(async () => {
+                await timer.pause();
+                onHome();
+              })
+            }
+            disabled={working}
+          >
+            <Home size={16} />
+            <span>Home</span>
+          </button>
           {document.fullscreenEnabled && (
             <button
               className="cbt-header-button cbt-fullscreen"

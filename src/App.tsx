@@ -1,4 +1,6 @@
+import { StudyNavigator } from './components/StudyNavigator';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { AppHeader } from './components/AppHeader';
 import { App as NativeApp } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
 import {
@@ -64,7 +66,7 @@ export default function App({
   onBack,
   folderName,
   renderNotes,
-  renderBreadcrumbs,
+  navigation,
   onHome,
   onSettings,
 }: {
@@ -72,7 +74,7 @@ export default function App({
   onBack: () => void;
   folderName: string;
   renderNotes: () => ReactNode;
-  renderBreadcrumbs: () => ReactNode;
+  navigation: ReactNode;
   onHome: () => void;
   onSettings: () => void;
 }) {
@@ -441,29 +443,16 @@ export default function App({
     </article>
   );
   return (
-    <div className="app-shell monty-shell">
-      <header className="app-header">
-        <button
-          className="brand brand-button"
-          aria-label="Monty home"
-          onClick={() => void timer.pause().then(onHome)}
-        >
-          <span className="brand-mark">
-            <NotebookPen size={26} />
-          </span>
-          <span>Monty</span>
-        </button>
-        <CloudStatus />
-        {!fullQuiz && (
-          <button className="icon-button" aria-label="Settings" onClick={onSettings}>
-            <SettingsIcon size={21} />
-          </button>
-        )}
-      </header>
+    <div
+      className={
+        'app-shell monty-shell ' + (Capacitor.isNativePlatform() ? 'native-shell' : 'web-shell')
+      }
+    >
+      {navigation}
+      <AppHeader onHome={() => void timer.pause().then(onHome)} onSettings={onSettings} />
       <main ref={main}>
         {!fullQuiz && (
           <>
-            {renderBreadcrumbs()}
             <div className="folder-toolbar">
               <button className="back-button" onClick={() => void timer.pause().then(onBack)}>
                 <ArrowLeft size={17} /> Folders
@@ -496,6 +485,7 @@ export default function App({
             <VocabularyExam
               test={active}
               timer={timer}
+              onHome={onHome}
               saved={state.bookmarks.includes(active.questions[active.draft!.index].entry.id)}
               onBookmark={() => bookmark(active.questions[active.draft!.index].entry)}
               onUpdate={(change) =>
@@ -814,6 +804,11 @@ export default function App({
                   </div>
                   {words.length ? (
                     <>
+                      <StudyNavigator
+                        key={words.map((word) => word.id).join('|')}
+                        ids={words.map((word) => word.id)}
+                        onReveal={(index) => setLearnLimit((old) => Math.max(old, index + 1))}
+                      />
                       <div className="word-grid">
                         {words.slice(0, learnLimit).map((entry) => (
                           <WordCard

@@ -11,6 +11,7 @@ export function QuestionTracker({
   marked,
   onNavigate,
   practice = false,
+  study = false,
 }: {
   ids: string[];
   index: number;
@@ -19,6 +20,7 @@ export function QuestionTracker({
   marked?: string[];
   onNavigate: (index: number) => void;
   practice?: boolean;
+  study?: boolean;
 }) {
   const items = questionProgress(ids, answered, visited, marked, ids[index]);
   const count = items.filter((q) => q.answered).length;
@@ -38,9 +40,9 @@ export function QuestionTracker({
   const position = (
     <div className="question-position">
       <label>
-        Question{' '}
+        {study ? 'Card' : 'Question'}{' '}
         <select
-          aria-label={practice ? 'Practice question' : 'Test question'}
+          aria-label={study ? 'Study card' : practice ? 'Practice question' : 'Test question'}
           value={index}
           onChange={(e) => onNavigate(Number(e.target.value))}
         >
@@ -104,7 +106,8 @@ export function QuestionTracker({
           <div>
             <h2 id={panelId + '-title'}>Question palette</h2>
             <p>
-              {practice ? 'Practice' : 'Quiz'} · Question {index + 1} of {ids.length}
+              {study ? 'Study' : practice ? 'Practice' : 'Quiz'} · {study ? 'Card' : 'Question'}{' '}
+              {index + 1} of {ids.length}
             </p>
           </div>
           <button
@@ -120,16 +123,22 @@ export function QuestionTracker({
         <div className="palette-sheet-content">
           <section aria-label={practice ? 'Practice progress' : 'Quiz progress'}>
             <strong>
-              {count} / {ids.length} answered
+              {count} / {ids.length} {study ? 'viewed' : 'answered'}
             </strong>
-            <progress aria-label="Answered questions" value={count} max={ids.length} />
+            <progress
+              aria-label={study ? 'Viewed cards' : 'Answered questions'}
+              value={count}
+              max={ids.length}
+            />
             <div className="tracker-counts">
               <span className="answered">
-                <b>{count}</b> Answered
+                <b>{count}</b> {study ? 'Viewed' : 'Answered'}
               </span>
-              <span className="unanswered">
-                <b>{items.filter((q) => q.visited && !q.answered).length}</b> Not answered
-              </span>
+              {!study && (
+                <span className="unanswered">
+                  <b>{items.filter((q) => q.visited && !q.answered).length}</b> Not answered
+                </span>
+              )}
               {!practice && (
                 <span className="marked">
                   <b>{items.filter((q) => q.marked).length}</b> For review
@@ -141,7 +150,10 @@ export function QuestionTracker({
             </div>
           </section>
           <p className="palette-hint" id={panelId + '-hint'}>
-            Tap a number to open a question. Your current question has an outline.
+            {study
+              ? 'Choose a number to jump to a study card.'
+              : 'Choose a number to open a question.'}{' '}
+            Your current item has an outline.
           </p>
           <div className="palette-grid" aria-label="Question palette">
             {items.map((q, i) => (
@@ -153,7 +165,7 @@ export function QuestionTracker({
                   (q.answered ? 'answered' : q.visited ? 'unanswered' : 'unvisited') +
                   (q.marked ? ' marked' : '')
                 }
-                aria-label={`Question ${i + 1}, ${q.answered ? 'answered' : q.visited ? 'not answered' : 'not visited'}${q.marked ? ', marked for review' : ''}`}
+                aria-label={`Question ${i + 1}, ${q.answered ? (study ? 'viewed' : 'answered') : q.visited ? 'not answered' : 'not visited'}${q.marked ? ', marked for review' : ''}`}
                 aria-current={i === index ? 'step' : undefined}
                 onClick={() => jump(i)}
               >

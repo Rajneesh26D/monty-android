@@ -1,4 +1,8 @@
 import { useState, useEffect } from 'react';
+import { Capacitor } from '@capacitor/core';
+import { AppHeader } from './components/AppHeader';
+import { WorkspaceNav } from './components/WorkspaceNav';
+import { HomeDashboard } from './components/HomeDashboard';
 import {
   NotebookPen,
   Calculator,
@@ -45,9 +49,12 @@ export default function Monty() {
   useEffect(() => {
     let disposed = false;
     let cleanup: (() => void) | undefined;
-    if (mobileCloud) void mobileConnection().then(connection => {
-      if (!disposed && !connection) setSettings(true);
-    }).catch(() => {});
+    if (mobileCloud)
+      void mobileConnection()
+        .then((connection) => {
+          if (!disposed && !connection) setSettings(true);
+        })
+        .catch(() => {});
     void initializeUpdates(() => setSettings(true))
       .then((remove) => {
         if (disposed) remove();
@@ -325,39 +332,36 @@ export default function Monty() {
       </form>
     </div>
   );
-  const breadcrumbs = area && (
-    <div className="breadcrumbs">
-      <button
-        onClick={() => {
-          setSubject(null);
-          setArea(null);
-          setFolderId(null);
-        }}
-      >
-        Home
-      </button>
-      <span>/</span>
-      <button
-        onClick={() => {
-          setFolderId(null);
-          if (subject === 'english') setArea(null);
-        }}
-      >
-        {subject === 'english' ? 'English' : 'Maths'}
-      </button>
-      {subject === 'english' && (
-        <>
-          <span>/</span>
-          <button onClick={() => setFolderId(null)}>{labels[area]}</button>
-        </>
-      )}
-      {folder && (
-        <>
-          <span>/</span>
-          <strong>{folder.name}</strong>
-        </>
-      )}
-    </div>
+  const goHome = () => {
+    setSubject(null);
+    setArea(null);
+    setFolderId(null);
+    setSettings(false);
+  };
+  const goArea = (next: Area) => {
+    setSubject(next === 'maths' ? 'maths' : 'english');
+    setArea(next);
+    setFolderId(null);
+    setSettings(false);
+  };
+  const goFolder = (next: Folder) => {
+    setSubject(next.area === 'maths' ? 'maths' : 'english');
+    setArea(next.area);
+    setFolderId(next.id);
+    setSettings(false);
+  };
+  const navigation = (
+    <WorkspaceNav
+      state={state}
+      area={area}
+      folderId={folderId}
+      settings={settings}
+      home={!subject && !settings}
+      onHome={goHome}
+      onArea={goArea}
+      onFolder={goFolder}
+      onSettings={() => setSettings(true)}
+    />
   );
   if (folder?.profile === 'vocab' && !settings)
     return (
@@ -371,44 +375,21 @@ export default function Monty() {
           renderNotes={() => (
             <NotesPanel folderId={folder.id} state={state} commit={commit} notify={notify} />
           )}
-          renderBreadcrumbs={() => breadcrumbs}
-          onHome={() => {
-            setSubject(null);
-            setArea(null);
-            setFolderId(null);
-          }}
+          navigation={navigation}
+          onHome={goHome}
         />
         {toastView}
         {creationView}
       </>
     );
   return (
-    <div className="app-shell monty-shell">
-      <header className="app-header">
-        <button
-          className="brand brand-button"
-          onClick={() => {
-            setSubject(null);
-            setArea(null);
-            setFolderId(null);
-            setSettings(false);
-          }}
-          aria-label="Monty home"
-        >
-          <span className="brand-mark">
-            <NotebookPen size={26} />
-          </span>
-          <span>Monty</span>
-        </button>
-        <CloudStatus />
-        <button
-          className="icon-button"
-          aria-label="Settings"
-          onClick={() => setSettings((s) => !s)}
-        >
-          <SettingsIcon size={21} />
-        </button>
-      </header>
+    <div
+      className={
+        'app-shell monty-shell ' + (Capacitor.isNativePlatform() ? 'native-shell' : 'web-shell')
+      }
+    >
+      {navigation}
+      <AppHeader onHome={goHome} onSettings={() => setSettings((s) => !s)} />
       <main>
         {error && (
           <div className="notice danger" role="alert">
@@ -423,42 +404,15 @@ export default function Monty() {
             notify={notify}
           />
         ) : !subject ? (
-          <>
-            <div className="home-heading">
-              <span className="eyebrow">Your study space</span>
-              <h1>What shall we study?</h1>
-            </div>
-            <div className="subject-grid">
-              <button
-                className="subject-card english"
-                onClick={() => {
-                  setSubject('english');
-                  setArea(null);
-                }}
-              >
-                <BookOpen size={32} />
-                <span>
-                  <strong>English</strong>
-                  <small>Grammar, vocabulary & reading</small>
-                </span>
-                <ChevronRight />
-              </button>
-              <button
-                className="subject-card maths"
-                onClick={() => {
-                  setSubject('maths');
-                  setArea('maths');
-                }}
-              >
-                <Calculator size={32} />
-                <span>
-                  <strong>Maths</strong>
-                  <small>Notes, practice & timed tests</small>
-                </span>
-                <ChevronRight />
-              </button>
-            </div>
-          </>
+          <HomeDashboard
+            state={state}
+            onEnglish={() => {
+              setSubject('english');
+              setArea(null);
+            }}
+            onMaths={() => goArea('maths')}
+            onFolder={goFolder}
+          />
         ) : !area ? (
           <>
             <button className="back-button" onClick={() => setSubject(null)}>
@@ -477,7 +431,6 @@ export default function Monty() {
           </>
         ) : (
           <>
-            {breadcrumbs}
             {!folder && (
               <div className="page-heading">
                 <h1>{labels[area]}</h1>
@@ -510,6 +463,7 @@ export default function Monty() {
                 commit={commit}
                 notify={notify}
                 onBack={leaveFolder}
+                onHome={goHome}
               />
             )}
           </>

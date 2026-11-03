@@ -24,7 +24,7 @@ export function WordCard({
   onEdit?: () => void;
 }) {
   return (
-    <article className="word-card">
+    <article className="word-card" data-study-id={entry.id}>
       <div className="card-heading">
         <h2>{entry.word}</h2>
         <div className="actions">

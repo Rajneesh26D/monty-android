@@ -11,6 +11,7 @@ export function ExamScreen({
   bank,
   onUpdate,
   onExit,
+  onHome,
   onFinished,
   saved,
   onBookmark,
@@ -19,6 +20,7 @@ export function ExamScreen({
   bank: Bank;
   onUpdate: (fn: (t: Exam) => Exam) => Promise<unknown>;
   onExit: () => void;
+  onHome: () => void;
   onFinished: () => void;
   saved: (q: MCQ) => boolean;
   onBookmark: (q: MCQ) => void;
@@ -68,6 +70,7 @@ export function ExamScreen({
         })
       }
       onExit={onExit}
+      onHome={onHome}
       onSubmit={() => finish(timer.capture()!)}
     >
       <MCQView

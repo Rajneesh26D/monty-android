@@ -5,6 +5,7 @@ import App from './Monty';
 import './styles.css';
 import './responsive.css';
 import './computer-exam.css';
+import './workspace.css';
 class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { error: boolean }> {
   state = { error: false };
   static getDerivedStateFromError() {
