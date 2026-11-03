@@ -1,3 +1,4 @@
+import { AppearanceSettings } from './AppearanceSettings';
 import { useEffect, useState, useRef } from 'react';
 import { ArrowLeft, Download, Upload, Link, Unlink } from 'lucide-react';
 import type { State } from '../../shared/types';
@@ -44,6 +45,7 @@ export function Settings({
         <ArrowLeft size={18} /> Back
       </button>
       <h1>Settings</h1>
+      <AppearanceSettings />
       {cloudEnabled && <CloudSettings notify={notify} />}
       {androidUpdates && <Updates />}
       <section className="panel">

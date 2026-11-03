@@ -201,6 +201,10 @@ test('custom split tests are disjoint, deletable with confirmation and remain de
   await page.getByLabel('Split tests').selectOption('3');
   await expect(page.getByText('6 + 6 + 5 questions · 3 separate results')).toBeVisible();
   await page.getByRole('button', { name: 'Create 3 tests & start' }).click();
+  await page
+    .getByRole('dialog', { name: 'Set your test timer' })
+    .getByRole('button', { name: 'Start test', exact: true })
+    .click();
   await page.getByRole('button', { name: 'Save & exit' }).click();
   const before = await state(page);
   expect(before.tests.map((t) => t.questions.length)).toEqual([6, 6, 5]);

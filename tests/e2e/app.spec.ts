@@ -55,13 +55,11 @@ async function restore(page: Page, state = seed()) {
   await page.goto('/');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
   page.once('dialog', (d) => d.accept());
-  await page
-    .locator('input[type=file]')
-    .setInputFiles({
-      name: 'seed.json',
-      mimeType: 'application/json',
-      buffer: Buffer.from(JSON.stringify(state)),
-    });
+  await page.locator('input[type=file]').setInputFiles({
+    name: 'seed.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from(JSON.stringify(state)),
+  });
   await expect(page.getByText('Backup restored.', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Back', exact: true }).click();
 }
@@ -135,6 +133,10 @@ test('conceals all answers until completion, persists practice toggle, and repla
   await page.getByLabel('Lecture One').check();
   await page.getByRole('button', { name: 'All', exact: true }).click();
   await page.getByRole('button', { name: 'Generate & start' }).click();
+  await page
+    .getByRole('dialog', { name: 'Set your test timer' })
+    .getByRole('button', { name: 'Start test', exact: true })
+    .click();
   await answerTest(page, true);
   await expect(page.locator('.score')).toHaveText('2/2');
   await page.getByRole('button', { name: 'Analyse answers' }).click();
@@ -157,6 +159,10 @@ test('conceals all answers until completion, persists practice toggle, and repla
   await expect(page.getByRole('switch')).toBeChecked();
   await page.getByRole('button', { name: 'Results', exact: true }).first().click();
   await page.getByRole('button', { name: 'Reattempt test', exact: true }).click();
+  await page
+    .getByRole('dialog', { name: 'Set your reattempt timer' })
+    .getByRole('button', { name: 'Start reattempt', exact: true })
+    .click();
   expect((await readState(page)).tests[0].latest?.score).toBe(2);
   await answerTest(page, false);
   await expect(page.locator('.score')).toHaveText('0/2');
@@ -175,6 +181,10 @@ test('combined and changing bookmark collections create independent snapshots, a
   await page.getByRole('button', { name: 'Select all', exact: true }).click();
   await page.getByRole('button', { name: 'All', exact: true }).click();
   await page.getByRole('button', { name: 'Generate & start' }).click();
+  await page
+    .getByRole('dialog', { name: 'Set your test timer' })
+    .getByRole('button', { name: 'Start test', exact: true })
+    .click();
   let s = await readState(page);
   expect(s.tests[0].questions).toHaveLength(3);
   expect(s.tests[0].source).toBe('combined');
@@ -194,6 +204,10 @@ test('combined and changing bookmark collections create independent snapshots, a
   await page.getByRole('button', { name: 'Save & exit' }).click();
   await page.getByRole('button', { name: 'Bookmarks', exact: true }).click();
   await page.getByRole('button', { name: 'Generate & start' }).click();
+  await page
+    .getByRole('dialog', { name: 'Set your test timer' })
+    .getByRole('button', { name: 'Start test', exact: true })
+    .click();
   expect((await readState(page)).tests[0].questions).toHaveLength(2);
   await page.getByRole('button', { name: 'Save & exit' }).click();
   await page.getByRole('button', { name: 'Learn', exact: true }).last().click();
@@ -204,6 +218,10 @@ test('combined and changing bookmark collections create independent snapshots, a
     .click();
   await page.getByRole('button', { name: 'Quiz', exact: true }).last().click();
   await page.getByRole('button', { name: 'Generate & start' }).click();
+  await page
+    .getByRole('dialog', { name: 'Set your test timer' })
+    .getByRole('button', { name: 'Start test', exact: true })
+    .click();
   s = await readState(page);
   expect(s.tests.map((t) => t.questions.length)).toEqual([3, 2, 3]);
 });

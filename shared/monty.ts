@@ -10,8 +10,25 @@ export const folderSchema = z.object({
   createdAt: z.number(),
 });
 export type Folder = z.infer<typeof folderSchema>;
+export const DEFAULT_TIMER_MINUTES = 15;
+export const MAX_TIMER_MINUTES = 525600;
+export const DEFAULT_DURATION_MS = DEFAULT_TIMER_MINUTES * 60000;
+export function timerDuration(minutes = DEFAULT_TIMER_MINUTES): number {
+  if (!Number.isInteger(minutes) || minutes < 1 || minutes > MAX_TIMER_MINUTES)
+    throw new Error(`Enter a whole number of minutes between 1 and ${MAX_TIMER_MINUTES}.`);
+  return minutes * 60000;
+}
 export const clockSchema = z.object({
-  remainingMs: z.number().min(0).max(900000),
+  durationMs: z
+    .number()
+    .int()
+    .min(60000)
+    .max(MAX_TIMER_MINUTES * 60000)
+    .optional(),
+  remainingMs: z
+    .number()
+    .min(0)
+    .max(MAX_TIMER_MINUTES * 60000),
   spent: z.record(z.string(), z.number().nonnegative()),
   updatedAt: z.number(),
   paused: z.boolean().default(true),
@@ -182,8 +199,9 @@ export const emptyWorkspace = (): Workspace => ({
   mathTestBookmarks: {},
   seedVersion: 0,
 });
-export const freshClock = (): AttemptClock => ({
-  remainingMs: 900000,
+export const freshClock = (minutes = DEFAULT_TIMER_MINUTES): AttemptClock => ({
+  durationMs: timerDuration(minutes),
+  remainingMs: timerDuration(minutes),
   spent: {},
   updatedAt: Date.now(),
   paused: true,

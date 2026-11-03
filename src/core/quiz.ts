@@ -1,4 +1,4 @@
-import { freshClock } from '../../shared/monty';
+import { freshClock, DEFAULT_DURATION_MS } from '../../shared/monty';
 import { type Answers, type Entry, type QuizTest, type Result, uid } from '../../shared/types';
 import { canQuiz, normalize } from './vocabulary';
 export function shuffle<T>(items: T[]): T[] {
@@ -93,13 +93,13 @@ export function splitTest(test: QuizTest, parts: number): QuizTest[] {
     };
   });
 }
-export function startAttempt(test: QuizTest): QuizTest {
+export function startAttempt(test: QuizTest, minutes = 15): QuizTest {
   return {
     ...test,
     questions: shuffle(test.questions).map((q) => ({ ...q, options: shuffle(q.options) })),
     draft: {
       id: uid(),
-      clock: { ...freshClock(), paused: false },
+      clock: { ...freshClock(minutes), paused: false },
       index: 0,
       answers: {},
       visited: [],
@@ -124,7 +124,9 @@ export function grade(test: QuizTest, answers: Answers, allowPartial = false): R
     ).length,
     unanswered: test.questions.filter((q) => !Object.keys(answers[q.id] ?? {}).length).length,
     spent: test.draft?.clock?.spent,
-    elapsedMs: test.draft?.clock ? 900000 - test.draft.clock.remainingMs : undefined,
+    elapsedMs: test.draft?.clock
+      ? (test.draft.clock.durationMs ?? DEFAULT_DURATION_MS) - test.draft.clock.remainingMs
+      : undefined,
     total: test.questions.length,
     answers: structuredClone(answers),
   };

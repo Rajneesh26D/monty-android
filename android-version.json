@@ -1,5 +1,5 @@
 {
-  "versionCode": 20110,
-  "versionName": "2.1.10",
-  "notes": "Redesign the desktop workspace and mobile home screen; add clear Home navigation that preserves timed attempts; provide numbered practice palettes for English, Maths, vocabulary and study cards; place the desktop exam triangle behind the scrollbar with only its tip exposed."
+  "versionCode": 20111,
+  "versionName": "2.1.11",
+  "notes": "Choose a custom timer for every test and reattempt, with 15 minutes selected by default. New dark and light display modes, five accent themes (violet, red, pink, yellow and teal), stronger text contrast and a saved appearance preference. Custom timers preserve remaining time and accurate time-taken results across save, resume and sync."
 }

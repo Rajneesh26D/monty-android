@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import type { AttemptClock } from '../../shared/monty';
+import { DEFAULT_DURATION_MS, type AttemptClock } from '../../shared/monty';
 import { advanceClock } from '../core/exams';
 import { saveClock } from '../storage/repository';
 export function useAttemptClock(
@@ -18,7 +18,7 @@ export function useAttemptClock(
     qid = useRef(questionId ?? ''),
     lastSave = useRef(0),
     expiring = useRef(false);
-  const [display, setDisplay] = useState(initial?.remainingMs ?? 900000),
+  const [display, setDisplay] = useState(initial?.remainingMs ?? DEFAULT_DURATION_MS),
     [paused, setPaused] = useState(true),
     [busy, setBusy] = useState(false);
   const capture = () => {

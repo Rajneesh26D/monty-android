@@ -122,6 +122,10 @@ test('timed maths tests pause, restore question and answers, then expire with an
   await uploadMaths(page);
   await nav(page, 'Tests').click();
   await page.getByRole('button', { name: 'Start test', exact: true }).first().click();
+  await page
+    .getByRole('dialog', { name: 'Set your test timer' })
+    .getByRole('button', { name: 'Start test', exact: true })
+    .click();
   await expect(page.getByRole('timer')).toHaveText('15:00');
   await page.clock.runFor(6000);
   await page.locator('.mcq-option').first().click();
@@ -182,6 +186,10 @@ test('idioms source cards and meaning quizzes work without AI', async ({ page })
   await nav(page, 'Quiz').click();
   await page.locator('.pdf-check input').check();
   await page.getByRole('button', { name: 'Generate & start' }).click();
+  await page
+    .getByRole('dialog', { name: 'Set your test timer' })
+    .getByRole('button', { name: 'Start test', exact: true })
+    .click();
   await expect(page.getByRole('timer')).toHaveText('15:00');
   await expect(page.locator('.mcq-option')).toHaveCount(4);
   await expect(page.getByText('Correct answer', { exact: true })).toHaveCount(0);
@@ -244,6 +252,10 @@ test('new grammar folders use the general importer and resume after a quota inte
   await nav(page, 'Quiz').click();
   await page.locator('.pdf-check input').check();
   await page.getByRole('button', { name: 'Generate & start' }).click();
+  await page
+    .getByRole('dialog', { name: 'Set your test timer' })
+    .getByRole('button', { name: 'Start test', exact: true })
+    .click();
   await expect(page.getByText('AI-generated · source page 1')).toBeVisible();
   await page.locator('.mcq-option').first().click();
   page.once('dialog', (d) => d.accept());
@@ -259,6 +271,10 @@ test('maths resumes the fifth question after a browser reload with its saved tim
   await uploadMaths(page);
   await nav(page, 'Tests').click();
   await page.getByRole('button', { name: 'Start test', exact: true }).first().click();
+  await page
+    .getByRole('dialog', { name: 'Set your test timer' })
+    .getByRole('button', { name: 'Start test', exact: true })
+    .click();
   await expect(page.locator('.mcq-option').first()).toBeEnabled();
   await page.clock.fastForward(300000);
   for (let i = 0; i < 4; i++) {
@@ -306,6 +322,10 @@ test('a complete Monty ZIP restores notes, question banks and paused test answer
   await page.locator('input[type=file]').setInputFiles('tests/fixtures/idioms.pdf');
   await nav(page, 'Tests').click();
   await page.getByRole('button', { name: 'Start test', exact: true }).first().click();
+  await page
+    .getByRole('dialog', { name: 'Set your test timer' })
+    .getByRole('button', { name: 'Start test', exact: true })
+    .click();
   await page.locator('.mcq-option').first().click();
   await page.getByRole('button', { name: 'Save & exit' }).click();
   await expect(page.getByText('Saved online', { exact: true })).toBeVisible();

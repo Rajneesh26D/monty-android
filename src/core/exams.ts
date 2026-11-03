@@ -1,5 +1,5 @@
 import type { Exam, Bank, AttemptClock } from '../../shared/monty';
-import { freshClock } from '../../shared/monty';
+import { freshClock, DEFAULT_DURATION_MS } from '../../shared/monty';
 import { uid } from '../../shared/types';
 export function mathsTests(
   bank: Bank,
@@ -19,7 +19,7 @@ export function mathsTests(
     source: 'pdf' as const,
   }));
 }
-export function startExam(test: Exam): Exam {
+export function startExam(test: Exam, minutes = 15): Exam {
   return {
     ...test,
     draft: {
@@ -28,7 +28,7 @@ export function startExam(test: Exam): Exam {
       answers: {},
       visited: test.questionIds.slice(0, 1),
       marked: [],
-      clock: { ...freshClock(), paused: false },
+      clock: { ...freshClock(minutes), paused: false },
       startedAt: Date.now(),
     },
   };
@@ -56,7 +56,7 @@ export function finishExam(test: Exam, bank: Bank): Exam {
       unanswered,
       total: test.questionIds.length,
       spent: d.clock.spent,
-      elapsedMs: 900000 - d.clock.remainingMs,
+      elapsedMs: (d.clock.durationMs ?? DEFAULT_DURATION_MS) - d.clock.remainingMs,
     },
   };
 }
@@ -67,6 +67,7 @@ export function advanceClock(
 ): AttemptClock {
   const delta = Math.min(clock.remainingMs, Math.max(0, elapsed));
   return {
+    ...clock,
     remainingMs: clock.remainingMs - delta,
     spent: { ...clock.spent, [questionId]: (clock.spent[questionId] ?? 0) + delta },
     updatedAt: Date.now(),

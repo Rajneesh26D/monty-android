@@ -1,3 +1,4 @@
+import { useTestDuration } from './TestDuration';
 import { StudyNavigator } from './StudyNavigator';
 import { PdfCard } from './PdfCard';
 import { StudyContent } from './StudyContent';
@@ -52,6 +53,7 @@ export function StudyFolder({
   onBack: () => void;
   onHome: () => void;
 }) {
+  const { chooseDuration, timerDialog } = useTestDuration();
   const [tab, setTab] = useState<Tab>('practice'),
     [bank, setBank] = useState<Bank | null>(null),
     [selectedPdf, setSelectedPdf] = useState<string | null>(null),
@@ -150,7 +152,9 @@ export function StudyFolder({
         : s;
     });
   async function start(t: Exam) {
-    await patchTest(t.id, startExam);
+    const minutes = await chooseDuration(t.name, !!t.latest);
+    if (minutes === null) return;
+    await patchTest(t.id, (test) => startExam(test, minutes));
     setActiveId(t.id);
     setResultId(null);
     setSelectedPdf(null);
@@ -219,6 +223,8 @@ export function StudyFolder({
       questions.length,
       !bookmarkSource && selection.length > 1 ? splits : 1,
     );
+    const minutes = await chooseDuration('New quiz', false, sizes.length);
+    if (minutes === null) return;
     const id = 'bank-' + uid(),
       combined: Bank = { version: 1, id, kind: 'general', questions, study, warnings: [] };
     await saveBank(combined);
@@ -261,7 +267,9 @@ export function StudyFolder({
         },
         tests: {
           ...s.monty!.tests,
-          ...Object.fromEntries(generated.map((t, i) => [t.id, i === 0 ? startExam(t) : t])),
+          ...Object.fromEntries(
+            generated.map((t, i) => [t.id, i === 0 ? startExam(t, minutes) : t]),
+          ),
         },
       },
     }));
@@ -283,7 +291,7 @@ export function StudyFolder({
       <div className="card-heading">
         <div>
           <h3>{t.name}</h3>
-          <p className="muted">{t.questionIds.length} questions · 15 min</p>
+          <p className="muted">{t.questionIds.length} questions · 15 min default · customizable</p>
           {t.draft && <small>Paused · {time(t.draft.clock.remainingMs)} remaining</small>}
         </div>
         <button
@@ -409,6 +417,7 @@ export function StudyFolder({
       />
     ) : (
       <>
+        {timerDialog}
         <button className="back-button" onClick={() => setResultId(null)}>
           <ArrowLeft size={17} /> {math ? 'Tests' : 'Results'}
         </button>
@@ -451,6 +460,7 @@ export function StudyFolder({
   }
   return (
     <>
+      {timerDialog}
       <div className="folder-toolbar">
         <button className="back-button" onClick={onBack}>
           <ArrowLeft size={17} /> Folders
@@ -779,7 +789,7 @@ export function StudyFolder({
                       </select>
                     </label>
                   )}
-                  <p className="muted">15 minutes per test · answers after submission</p>
+                  <p className="muted">Choose your timer before starting · 15 minutes by default</p>
                   <button className="primary full" onClick={() => void act(generate)}>
                     Generate & start
                   </button>

@@ -39,7 +39,7 @@ export async function buildOffline() {
     .filter((a) => a.type === 'asset' && a.fileName.endsWith('.css'))
     .map((a) => a.source)
     .join('\n');
-  const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#173e38"><title>Monty Offline</title><style>${css}</style></head><body><!--MONTY_SNAPSHOT--><div id="root"><p>Opening offline Monty…</p></div><script>${js.replace(/<\/script/gi, '<\\/script')}</script></body></html>`;
+  const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#0e1020"><title>Monty Offline</title><style>${css}</style></head><body><!--MONTY_SNAPSHOT--><div id="root"><p>Opening offline Monty…</p></div><script>${js.replace(/<\/script/gi, '<\\/script')}</script></body></html>`;
   await mkdir('client-dist', { recursive: true });
   await writeFile('client-dist/offline-shell.html', html);
 }

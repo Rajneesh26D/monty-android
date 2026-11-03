@@ -155,6 +155,10 @@ test('quiz answers stay hidden, latest reattempt result and review preference re
   await page.getByRole('button', { name: 'Quiz', exact: true }).last().click();
   await page.getByLabel('Lecture One').check();
   await page.getByRole('button', { name: 'Generate & start' }).click();
+  await page
+    .getByRole('dialog', { name: 'Set your test timer' })
+    .getByRole('button', { name: 'Start test', exact: true })
+    .click();
   async function answer(correct: boolean) {
     const q = (await local(page)).tests[0].questions[0];
     await expect(page.getByText(e.meaningEn, { exact: true })).toHaveCount(0);
@@ -178,6 +182,10 @@ test('quiz answers stay hidden, latest reattempt result and review preference re
   await expect(page.locator('.explanation')).toHaveCount(0);
   await page.getByRole('button', { name: 'Results', exact: true }).first().click();
   await page.getByRole('button', { name: 'Reattempt test', exact: true }).click();
+  await page
+    .getByRole('dialog', { name: 'Set your reattempt timer' })
+    .getByRole('button', { name: 'Start reattempt', exact: true })
+    .click();
   await answer(false);
   await expect(page.locator('.score')).toHaveText('0/1');
   await expect(page.getByText('Saved online', { exact: true })).toBeVisible();
@@ -251,6 +259,10 @@ test('combined and changing bookmark collections create independent snapshots, a
   await page.getByRole('button', { name: 'Select all', exact: true }).click();
   await page.getByRole('button', { name: 'All', exact: true }).click();
   await page.getByRole('button', { name: 'Generate & start' }).click();
+  await page
+    .getByRole('dialog', { name: 'Set your test timer' })
+    .getByRole('button', { name: 'Start test', exact: true })
+    .click();
   let s = await local(page);
   await expect(page.getByText('Question 1 of 3', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Save & next', exact: true }).click();
@@ -279,6 +291,10 @@ test('combined and changing bookmark collections create independent snapshots, a
   await page.getByRole('button', { name: 'Save & exit' }).click();
   await page.locator('.quiz-setup').getByRole('button', { name: 'Bookmarks', exact: true }).click();
   await page.getByRole('button', { name: 'Generate & start' }).click();
+  await page
+    .getByRole('dialog', { name: 'Set your test timer' })
+    .getByRole('button', { name: 'Start test', exact: true })
+    .click();
   expect((await local(page)).tests[0].questions).toHaveLength(2);
   await page.getByRole('button', { name: 'Save & exit' }).click();
   await studyWords(page);
@@ -289,6 +305,10 @@ test('combined and changing bookmark collections create independent snapshots, a
     .click();
   await page.getByRole('button', { name: 'Quiz', exact: true }).last().click();
   await page.getByRole('button', { name: 'Generate & start' }).click();
+  await page
+    .getByRole('dialog', { name: 'Set your test timer' })
+    .getByRole('button', { name: 'Start test', exact: true })
+    .click();
   s = await local(page);
   expect(s.tests.map((t) => t.questions.length)).toEqual([3, 2, 3]);
 });

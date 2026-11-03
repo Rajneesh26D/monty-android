@@ -1,3 +1,4 @@
+import { useTestDuration } from './components/TestDuration';
 import { StudyNavigator } from './components/StudyNavigator';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { AppHeader } from './components/AppHeader';
@@ -78,6 +79,7 @@ export default function App({
   onHome: () => void;
   onSettings: () => void;
 }) {
+  const { chooseDuration, timerDialog } = useTestDuration();
   const { state, commit, error, current } = store;
   const [tab, setTab] = useState<Tab>('library'),
     [toast, setToast] = useState(''),
@@ -211,7 +213,9 @@ export default function App({
     setSelected((ids) => ids.filter((x) => x !== id));
   }
   async function begin(test: QuizTest) {
-    const started = startAttempt(test);
+    const minutes = await chooseDuration(test.name, !!test.latest);
+    if (minutes === null) return;
+    const started = startAttempt(test, minutes);
     await commit((s) => ({ ...s, tests: s.tests.map((t) => (t.id === test.id ? started : t)) }));
     setActiveId(test.id);
     setAnalysisId(null);
@@ -246,7 +250,11 @@ export default function App({
     )
       throw new Error(`Choose between 1 and ${quizPool(entries).length} questions.`);
     const parts = !bookmarkSource && docs.length > 1 ? splits : 1;
-    const generated = (parts > 1 ? splitTest(test, parts) : [test]).map(startAttempt);
+    const minutes = await chooseDuration(test.name, false, parts);
+    if (minutes === null) return;
+    const generated = (parts > 1 ? splitTest(test, parts) : [test]).map((t, i) =>
+      i === 0 ? startAttempt(t, minutes) : t,
+    );
     await commit((s) => ({ ...s, tests: [...generated, ...s.tests] }));
     setActiveId(generated[0].id);
     setResultId(null);
@@ -449,6 +457,7 @@ export default function App({
       }
     >
       {navigation}
+      {timerDialog}
       <AppHeader onHome={() => void timer.pause().then(onHome)} onSettings={onSettings} />
       <main ref={main}>
         {!fullQuiz && (

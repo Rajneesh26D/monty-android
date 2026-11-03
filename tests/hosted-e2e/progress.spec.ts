@@ -127,6 +127,10 @@ test('Maths quiz saves review flags, visited palette, clear, navigation and earl
   await upload(page);
   await nav(page, 'Tests').click();
   await page.getByRole('button', { name: 'Start test', exact: true }).first().click();
+  await page
+    .getByRole('dialog', { name: 'Set your test timer' })
+    .getByRole('button', { name: 'Start test', exact: true })
+    .click();
   await expect(page.locator('.mcq-option').first()).toBeEnabled();
   await page.locator('.mcq-option').first().click();
   await page.getByRole('button', { name: 'Mark for review', exact: true }).click();
@@ -283,6 +287,10 @@ test('downloaded offline Monty runs its library and saves progress with all netw
     ).toBe(true);
     await nav(offline, 'Tests').click();
     await offline.getByRole('button', { name: 'Start test', exact: true }).first().click();
+    await offline
+      .getByRole('dialog', { name: 'Set your test timer' })
+      .getByRole('button', { name: 'Start test', exact: true })
+      .click();
     await expect(offline.locator('.mcq-option').first()).toBeEnabled();
     await offline.locator('.mcq-option').first().click();
     await offline.getByRole('button', { name: 'Mark for review', exact: true }).click();

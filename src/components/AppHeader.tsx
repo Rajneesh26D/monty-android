@@ -1,6 +1,9 @@
+import { setAppearance, useAppearance } from '../services/appearance';
+import { Moon, Sun } from 'lucide-react';
 import { Home, NotebookPen, Settings } from 'lucide-react';
 import { CloudStatus } from './CloudStatus';
 export function AppHeader({ onHome, onSettings }: { onHome: () => void; onSettings: () => void }) {
+  const appearance = useAppearance();
   return (
     <header className="app-header">
       <button className="brand brand-button" aria-label="Monty home" onClick={onHome}>
@@ -14,6 +17,15 @@ export function AppHeader({ onHome, onSettings }: { onHome: () => void; onSettin
         <CloudStatus />
       </div>
       <div className="header-actions">
+        <button
+          className="icon-button"
+          aria-label={appearance.mode === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
+          onClick={() =>
+            setAppearance({ ...appearance, mode: appearance.mode === 'dark' ? 'light' : 'dark' })
+          }
+        >
+          {appearance.mode === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
+        </button>
         <button className="home-button" onClick={onHome}>
           <Home size={18} />
           <span>Home</span>
