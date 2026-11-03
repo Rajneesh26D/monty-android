@@ -1,0 +1,324 @@
+/* Phone: one column. Tablet: two columns. Laptop: wider workspace.
+   Large desktop: additional library columns, with bounded question text. */
+.app-shell {
+  --page-gutter: 20px;
+  --page-bottom: 28px;
+  width: 100%;
+  max-width: none;
+  min-width: 0;
+}
+.app-shell > main {
+  min-width: 0;
+  min-height: 0;
+  padding: 24px var(--page-gutter) var(--page-bottom);
+  scroll-padding-block: 24px;
+}
+.app-header {
+  padding-inline: var(--page-gutter);
+  gap: 8px;
+}
+.app-header > .brand,
+.app-header > .icon-button {
+  flex-shrink: 0;
+}
+.app-header > .cloud-status {
+  margin-left: 4px;
+  overflow-wrap: anywhere;
+}
+.subject-grid > *,
+.folder-grid > *,
+.document-list > *,
+.word-grid > *,
+.practice-files > *,
+.notes-list > *,
+.settings-page > *,
+.saved-tests > * {
+  min-width: 0;
+}
+.subject-grid,
+.folder-grid,
+.document-list,
+.word-grid,
+.practice-files,
+.notes-list {
+  grid-template-columns: minmax(0, 1fr);
+}
+.practice-files,
+.notes-list,
+.saved-tests {
+  display: grid;
+  gap: 16px;
+}
+.practice-files > .document-card,
+.notes-list > .attachment-card,
+.saved-tests > .test-card {
+  margin: 0;
+}
+.settings-page {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+  gap: 16px;
+}
+.settings-page > .back-button {
+  justify-self: start;
+}
+.settings-page > .panel {
+  margin: 0;
+}
+.settings-page > .back-button,
+.settings-page > h1,
+.settings-page > .footnote {
+  grid-column: 1 / -1;
+}
+.folder-nav {
+  margin-inline: calc(-1 * var(--page-gutter));
+  margin-bottom: calc(-1 * var(--page-bottom));
+  bottom: calc(-1 * var(--page-bottom));
+}
+.app-shell > main:has(> .folder-nav) > .folder-nav {
+  flex-shrink: 0;
+}
+.breadcrumbs,
+.source-title,
+.test-card h2,
+.page-heading h1,
+.connected-device > div {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.page-heading {
+  flex-wrap: wrap;
+}
+.page-heading > button,
+.document-actions > button {
+  flex-shrink: 0;
+}
+.document-actions {
+  flex-wrap: wrap;
+}
+.document-actions > .text-button {
+  flex-basis: 100%;
+}
+.subject-card > span,
+.category-card > strong,
+.mcq-option > span:last-child,
+.option-heading {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.mcq-option .rich-text,
+.question-stem .rich-text,
+.passage .rich-text {
+  max-width: 100%;
+  overflow-x: auto;
+}
+.viewer-header,
+.viewer-tools {
+  flex-wrap: wrap;
+}
+.exam-toolbar {
+  top: -24px;
+}
+.editor-modal,
+.modal {
+  max-height: calc(100dvh - 40px);
+}
+
+/* Tablets, including portrait iPads and medium browser windows. */
+@media (min-width: 768px) {
+  .app-shell {
+    --page-gutter: 32px;
+    --page-bottom: 32px;
+  }
+  .app-shell > main {
+    padding-top: 32px;
+    scroll-padding-block: 32px;
+  }
+  .app-header {
+    height: calc(80px + env(safe-area-inset-top));
+  }
+  .subject-grid,
+  .folder-grid,
+  .document-list,
+  .word-grid,
+  .practice-files,
+  .notes-list,
+  .settings-page {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .home-heading {
+    padding-top: 40px;
+  }
+  .subject-card {
+    min-height: 180px;
+  }
+  .category-card {
+    min-height: 104px;
+  }
+  .exam-toolbar {
+    top: -32px;
+  }
+  .exam-page,
+  .active-quiz,
+  .folder-content:has(> .mcq-options) {
+    width: 100%;
+    max-width: 920px;
+    margin-inline: auto;
+  }
+  .palette-sheet {
+    inset: 0;
+    margin: auto;
+    width: min(680px, calc(100vw - 64px));
+    max-height: min(760px, calc(100dvh - 64px));
+    border-radius: 22px;
+  }
+}
+
+/* Laptops and landscape tablets: use the available width for the library. */
+@media (min-width: 1024px) {
+  .app-shell {
+    --page-gutter: 40px;
+    width: calc(100% - 48px);
+    max-width: 1440px;
+  }
+  .app-header > .cloud-status {
+    font-size: 12px;
+    gap: 8px;
+    margin-left: 14px;
+  }
+  .app-header > .cloud-status > span {
+    max-width: none;
+  }
+  .app-header > .cloud-status .text-button {
+    font-size: 12px;
+  }
+  .folder-grid,
+  .subject-grid:has(> .category-card) {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .home-heading h1 {
+    font-size: 48px;
+  }
+  .subject-grid {
+    gap: 24px;
+  }
+  .subject-card {
+    min-height: 220px;
+    padding: 32px;
+  }
+  .folder-nav,
+  .bottom-nav {
+    justify-content: center;
+    gap: 8px;
+    padding-inline: var(--page-gutter);
+  }
+  .folder-nav button,
+  .bottom-nav button {
+    flex-direction: row;
+    gap: 9px;
+    max-width: 180px;
+    min-height: 50px;
+    padding: 12px 16px;
+  }
+  .folder-nav button span,
+  .bottom-nav button span {
+    font-size: 13px;
+  }
+  .question-palette-dock {
+    padding-inline: var(--page-gutter);
+  }
+  .folder-content:has(> .quiz-setup) {
+    display: grid;
+    grid-template-columns: minmax(320px, 420px) minmax(0, 1fr);
+    align-items: start;
+    gap: 24px;
+  }
+  .folder-content:has(> .quiz-setup) > .page-heading {
+    grid-column: 1 / -1;
+    margin-bottom: 0;
+  }
+  .folder-content > .quiz-setup {
+    margin-bottom: 0;
+  }
+  .exam-actions button {
+    font-size: 12px;
+  }
+}
+
+/* Large monitors: more cards without stretching individual questions. */
+@media (min-width: 1600px) {
+  .app-shell {
+    --page-gutter: 48px;
+    --page-bottom: 40px;
+    width: calc(100% - 96px);
+    max-width: 1680px;
+  }
+  .app-shell > main {
+    padding-top: 40px;
+    scroll-padding-block: 40px;
+  }
+  .app-header {
+    height: calc(88px + env(safe-area-inset-top));
+  }
+  .folder-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+  .document-list,
+  .word-grid,
+  .practice-files,
+  .notes-list {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .settings-page {
+    gap: 24px;
+  }
+  .home-heading {
+    padding-top: 56px;
+  }
+  .home-heading h1 {
+    font-size: 54px;
+  }
+  .subject-card {
+    min-height: 250px;
+  }
+  .subject-card strong {
+    font-size: 34px;
+  }
+  .exam-toolbar {
+    top: -40px;
+  }
+  .folder-content:has(> .quiz-setup) .saved-tests {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* Narrow phones and short landscape windows retain usable controls. */
+@media (max-width: 374px) {
+  .app-shell {
+    --page-gutter: 16px;
+  }
+  .folder-nav button span {
+    font-size: 9px;
+  }
+  .segmented > button {
+    padding-inline: 9px;
+  }
+  .option {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (max-height: 500px) {
+  .app-shell {
+    min-height: 0;
+  }
+  .app-header {
+    height: calc(56px + env(safe-area-inset-top));
+  }
+  .home-heading {
+    padding-top: 8px;
+  }
+  .palette-sheet {
+    max-height: calc(100dvh - 24px);
+  }
+}

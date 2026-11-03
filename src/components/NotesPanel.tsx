@@ -62,36 +62,58 @@ export function NotesPanel({
           <p>Upload PDFs, images or other study files.</p>
         </div>
       )}
-      {notes.map((n) => (
-        <article className="attachment-card" key={n.id}>
-          <button
-            className="file-open"
-            onClick={() => {
-              if (isPdf(n.name, n.mime)) void openPdfInApp(n, notify);
-              else if (
-                Capacitor.isNativePlatform() &&
-                (n.mime.startsWith('image/') ||
-                  /\.(jpe?g|png|webp|gif|hei[cf]|bmp|svg)$/i.test(n.name))
-              )
-                void openImageInApp(n, notify);
-              else setOpened(n.id);
-            }}
-          >
-            <FileText size={22} />
-            <span>
-              <strong>{n.name}</strong>
-              <small>
-                {(n.size / 1024 / 1024).toFixed(1)} MB{n.pinned ? ' · Pinned' : ''}
-              </small>
-            </span>
-          </button>
-          <div className="actions">
+      <div className="notes-list">
+        {notes.map((n) => (
+          <article className="attachment-card" key={n.id}>
             <button
-              className="icon-button"
-              aria-label={`Rename ${n.name}`}
+              className="file-open"
               onClick={() => {
-                const name = prompt('Rename note', n.name)?.trim();
-                if (name)
+                if (isPdf(n.name, n.mime)) void openPdfInApp(n, notify);
+                else if (
+                  Capacitor.isNativePlatform() &&
+                  (n.mime.startsWith('image/') ||
+                    /\.(jpe?g|png|webp|gif|hei[cf]|bmp|svg)$/i.test(n.name))
+                )
+                  void openImageInApp(n, notify);
+                else setOpened(n.id);
+              }}
+            >
+              <FileText size={22} />
+              <span>
+                <strong>{n.name}</strong>
+                <small>
+                  {(n.size / 1024 / 1024).toFixed(1)} MB{n.pinned ? ' · Pinned' : ''}
+                </small>
+              </span>
+            </button>
+            <div className="actions">
+              <button
+                className="icon-button"
+                aria-label={`Rename ${n.name}`}
+                onClick={() => {
+                  const name = prompt('Rename note', n.name)?.trim();
+                  if (name)
+                    void act(() =>
+                      commit((s) => ({
+                        ...s,
+                        monty: {
+                          ...s.monty!,
+                          attachments: {
+                            ...s.monty!.attachments,
+                            [n.id]: { ...s.monty!.attachments[n.id], name },
+                          },
+                        },
+                      })),
+                    );
+                }}
+              >
+                <Pencil size={16} />
+              </button>
+              <button
+                className="icon-button"
+                aria-label={`${n.pinned ? 'Unpin' : 'Pin'} ${n.name}`}
+                aria-pressed={n.pinned}
+                onClick={() =>
                   void act(() =>
                     commit((s) => ({
                       ...s,
@@ -99,56 +121,36 @@ export function NotesPanel({
                         ...s.monty!,
                         attachments: {
                           ...s.monty!.attachments,
-                          [n.id]: { ...s.monty!.attachments[n.id], name },
+                          [n.id]: { ...s.monty!.attachments[n.id], pinned: !n.pinned },
                         },
                       },
                     })),
-                  );
-              }}
-            >
-              <Pencil size={16} />
-            </button>
-            <button
-              className="icon-button"
-              aria-label={`${n.pinned ? 'Unpin' : 'Pin'} ${n.name}`}
-              aria-pressed={n.pinned}
-              onClick={() =>
-                void act(() =>
-                  commit((s) => ({
-                    ...s,
-                    monty: {
-                      ...s.monty!,
-                      attachments: {
-                        ...s.monty!.attachments,
-                        [n.id]: { ...s.monty!.attachments[n.id], pinned: !n.pinned },
-                      },
-                    },
-                  })),
-                )
-              }
-            >
-              <Pin size={16} fill={n.pinned ? 'currentColor' : 'none'} />
-            </button>
-            <button
-              className="icon-button delete"
-              aria-label={`Delete note ${n.name}`}
-              onClick={() => {
-                if (confirm(`Permanently delete “${n.name}”?`))
-                  void act(async () => {
-                    await commit((s) => {
-                      const attachments = { ...s.monty!.attachments };
-                      delete attachments[n.id];
-                      return { ...s, monty: { ...s.monty!, attachments } };
+                  )
+                }
+              >
+                <Pin size={16} fill={n.pinned ? 'currentColor' : 'none'} />
+              </button>
+              <button
+                className="icon-button delete"
+                aria-label={`Delete note ${n.name}`}
+                onClick={() => {
+                  if (confirm(`Permanently delete “${n.name}”?`))
+                    void act(async () => {
+                      await commit((s) => {
+                        const attachments = { ...s.monty!.attachments };
+                        delete attachments[n.id];
+                        return { ...s, monty: { ...s.monty!, attachments } };
+                      });
+                      await removeAttachment(n.id);
                     });
-                    await removeAttachment(n.id);
-                  });
-              }}
-            >
-              <Trash2 size={16} />
-            </button>
-          </div>
-        </article>
-      ))}
+                }}
+              >
+                <Trash2 size={16} />
+              </button>
+            </div>
+          </article>
+        ))}
+      </div>
       {note && (
         <FileViewer
           id={note.id}

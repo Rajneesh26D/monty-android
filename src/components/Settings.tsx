@@ -39,7 +39,7 @@ export function Settings({
     }
   }
   return (
-    <div>
+    <div className="settings-page">
       <button className="back-button" onClick={onBack}>
         <ArrowLeft size={18} /> Back
       </button>

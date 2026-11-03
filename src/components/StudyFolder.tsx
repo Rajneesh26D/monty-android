@@ -580,20 +580,35 @@ export function StudyFolder({
                   <p>Add a PDF to extract its study content and questions.</p>
                 </div>
               )}
-              {files.map((file) => (
-                <PdfCard
-                  key={file.id}
-                  name={file.name}
-                  pinned={file.pinned}
-                  summary={
-                    <>
-                      {file.count} questions · {file.status}
-                    </>
-                  }
-                  disabled={!!progress}
-                  onRename={() => {
-                    const name = prompt('Rename PDF', file.name)?.trim();
-                    if (name)
+              <div className="practice-files">
+                {files.map((file) => (
+                  <PdfCard
+                    key={file.id}
+                    name={file.name}
+                    pinned={file.pinned}
+                    summary={
+                      <>
+                        {file.count} questions · {file.status}
+                      </>
+                    }
+                    disabled={!!progress}
+                    onRename={() => {
+                      const name = prompt('Rename PDF', file.name)?.trim();
+                      if (name)
+                        void act(() =>
+                          commit((s) => ({
+                            ...s,
+                            monty: {
+                              ...s.monty!,
+                              attachments: {
+                                ...s.monty!.attachments,
+                                [file.id]: { ...s.monty!.attachments[file.id], name },
+                              },
+                            },
+                          })),
+                        );
+                    }}
+                    onPin={() =>
                       void act(() =>
                         commit((s) => ({
                           ...s,
@@ -601,67 +616,54 @@ export function StudyFolder({
                             ...s.monty!,
                             attachments: {
                               ...s.monty!.attachments,
-                              [file.id]: { ...s.monty!.attachments[file.id], name },
+                              [file.id]: { ...s.monty!.attachments[file.id], pinned: !file.pinned },
                             },
                           },
                         })),
-                      );
-                  }}
-                  onPin={() =>
-                    void act(() =>
-                      commit((s) => ({
-                        ...s,
-                        monty: {
-                          ...s.monty!,
-                          attachments: {
-                            ...s.monty!.attachments,
-                            [file.id]: { ...s.monty!.attachments[file.id], pinned: !file.pinned },
-                          },
-                        },
-                      })),
-                    )
-                  }
-                  onDelete={() => void act(() => deleteFile(file))}
-                >
-                  {file.error && <p className="document-note">{file.error}</p>}
-                  {math && w.practice[file.id] && (
-                    <p className="practice-card-progress">
-                      {Object.values(w.practice[file.id].answers).filter(Boolean).length} /{' '}
-                      {file.count} answered
-                    </p>
-                  )}
-                  <div className="document-actions">
-                    {file.bankId && (
-                      <button
-                        className="primary"
-                        onClick={() => {
-                          setSelectedPdf(file.id);
-                          setStudyMode(!math);
-                        }}
-                      >
-                        Practice
-                      </button>
+                      )
+                    }
+                    onDelete={() => void act(() => deleteFile(file))}
+                  >
+                    {file.error && <p className="document-note">{file.error}</p>}
+                    {math && w.practice[file.id] && (
+                      <p className="practice-card-progress">
+                        {Object.values(w.practice[file.id].answers).filter(Boolean).length} /{' '}
+                        {file.count} answered
+                      </p>
                     )}
-                    <button className="secondary" onClick={() => void openPdfInApp(file, notify)}>
-                      Open PDF
-                    </button>
-                    {file.bankId && (
-                      <button className="text-button" onClick={() => setReview(file)}>
-                        Review / edit
+                    <div className="document-actions">
+                      {file.bankId && (
+                        <button
+                          className="primary"
+                          onClick={() => {
+                            setSelectedPdf(file.id);
+                            setStudyMode(!math);
+                          }}
+                        >
+                          Practice
+                        </button>
+                      )}
+                      <button className="secondary" onClick={() => void openPdfInApp(file, notify)}>
+                        Open PDF
                       </button>
-                    )}
-                    {file.status !== 'ready' && (
-                      <button
-                        className="text-button"
-                        disabled={!!progress}
-                        onClick={() => void run(undefined, file.id)}
-                      >
-                        Resume import
-                      </button>
-                    )}
-                  </div>
-                </PdfCard>
-              ))}
+                      {file.bankId && (
+                        <button className="text-button" onClick={() => setReview(file)}>
+                          Review / edit
+                        </button>
+                      )}
+                      {file.status !== 'ready' && (
+                        <button
+                          className="text-button"
+                          disabled={!!progress}
+                          onClick={() => void run(undefined, file.id)}
+                        >
+                          Resume import
+                        </button>
+                      )}
+                    </div>
+                  </PdfCard>
+                ))}
+              </div>
             </>
           )
         ) : tab === 'quiz' ? (
@@ -773,7 +775,9 @@ export function StudyFolder({
                     Generate & start
                   </button>
                 </section>
-                {tests.filter((t) => t.draft || !t.latest).map(testCard)}
+                <div className="saved-tests">
+                  {tests.filter((t) => t.draft || !t.latest).map(testCard)}
+                </div>
               </>
             )}
             {math && (
