@@ -237,7 +237,11 @@ test('downloaded offline Monty runs its library and saves progress with all netw
   await upload(page);
   await practice(page);
   await page.locator('.mcq-option').first().click();
-  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await page.getByRole('button', { name: 'Open navigation', exact: true }).click();
+  await page
+    .getByRole('dialog', { name: 'Menu', exact: true })
+    .getByRole('button', { name: 'Settings', exact: true })
+    .click();
   const downloading = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Download offline Monty', exact: true }).click();
   const download = await downloading;

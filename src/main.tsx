@@ -7,6 +7,7 @@ import './responsive.css';
 import './computer-exam.css';
 import './workspace.css';
 import './themes.css';
+import './navigation.css';
 import { initializeAppearance } from './services/appearance';
 initializeAppearance();
 class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { error: boolean }> {

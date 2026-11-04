@@ -330,7 +330,11 @@ test('a complete Monty ZIP restores notes, question banks and paused test answer
   await page.getByRole('button', { name: 'Save & exit' }).click();
   await expect(page.getByText('Saved online', { exact: true })).toBeVisible();
   const before = await local(page);
-  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await page.getByRole('button', { name: 'Open navigation', exact: true }).click();
+  await page
+    .getByRole('dialog', { name: 'Menu', exact: true })
+    .getByRole('button', { name: 'Settings', exact: true })
+    .click();
   const download = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Export backup', exact: true }).click();
   const saved = await download;
@@ -373,7 +377,11 @@ test('topic folders allow only one level in Grammar, Vocab, reading and Maths', 
 }) => {
   await page.goto('/');
   for (const area of ['Grammar', 'Vocab', 'PQRS / RS / CT / RC', 'Maths']) {
-    await page.getByRole('button', { name: 'Monty home', exact: true }).click();
+    await page.getByRole('button', { name: 'Open navigation', exact: true }).click();
+    await page
+      .getByRole('dialog', { name: 'Menu', exact: true })
+      .getByRole('button', { name: 'Home', exact: true })
+      .click();
     if (area === 'Maths') await page.getByRole('button', { name: /^Maths Notes/ }).click();
     else {
       await page.getByRole('button', { name: /^English Grammar/ }).click();

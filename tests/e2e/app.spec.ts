@@ -53,7 +53,11 @@ async function readState(page: Page): Promise<State> {
 }
 async function restore(page: Page, state = seed()) {
   await page.goto('/');
-  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await page.getByRole('button', { name: 'Open navigation', exact: true }).click();
+  await page
+    .getByRole('dialog', { name: 'Menu', exact: true })
+    .getByRole('button', { name: 'Settings', exact: true })
+    .click();
   page.once('dialog', (d) => d.accept());
   await page.locator('input[type=file]').setInputFiles({
     name: 'seed.json',
@@ -107,7 +111,11 @@ test('imports actual slides offline, retains Hindi and examples, and survives re
   ).toBeVisible();
   await page.reload();
   await expect(page.getByText('48 words', { exact: false }).first()).toBeVisible();
-  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await page.getByRole('button', { name: 'Open navigation', exact: true }).click();
+  await page
+    .getByRole('dialog', { name: 'Menu', exact: true })
+    .getByRole('button', { name: 'Settings', exact: true })
+    .click();
   const download = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Export backup' }).click();
   const file = await download;
@@ -288,7 +296,11 @@ test('AI completes changed layouts and scans, with resumable imports after quota
     });
   });
   await page.goto('/');
-  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await page.getByRole('button', { name: 'Open navigation', exact: true }).click();
+  await page
+    .getByRole('dialog', { name: 'Menu', exact: true })
+    .getByRole('button', { name: 'Settings', exact: true })
+    .click();
   await page.getByLabel('Backend address').fill('https://vocabmaster-test.workers.dev');
   await page.getByLabel('One-time connection code').fill('b'.repeat(32));
   await page.getByRole('button', { name: 'Connect device' }).click();

@@ -1,3 +1,4 @@
+import { useWorkspaceNavigation } from './components/WorkspaceNavigation';
 import { QuizOrderControls } from './components/QuizOrderControls';
 import { defaultQuizCustomization, type QuizCustomization } from '../shared/quiz-customization';
 import { QuizSplitControls } from './components/QuizSplitControls';
@@ -88,6 +89,7 @@ export default function App({
   const [customization, setCustomization] = useState<QuizCustomization>(defaultQuizCustomization);
   const [perQuiz, setPerQuiz] = useState<number | null>(null);
   const { state, commit, error, current } = store;
+  const navigationDrawer = useWorkspaceNavigation();
   const [tab, setTab] = useState<Tab>('library'),
     [toast, setToast] = useState(''),
     [progress, setProgress] = useState<{ message: string; percent: number } | null>(null);
@@ -123,10 +125,21 @@ export default function App({
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return;
     const h = NativeApp.addListener('backButton', () => {
+      if (navigationDrawer.getSnapshot().open || navigationDrawer.getSnapshot().busy) {
+        navigationDrawer.closeMenu();
+        return;
+      }
       if (editing) setEditing(null);
       else if (activeId) {
-        setActiveId(null);
-        setTab('quiz');
+        void timer
+          .pause()
+          .then(() => {
+            setActiveId(null);
+            setTab('quiz');
+          })
+          .catch((error) =>
+            setToast(error instanceof Error ? error.message : 'Could not save your attempt.'),
+          );
       } else if (analysisId) {
         setAnalysisId(null);
         setTab('results');
@@ -470,7 +483,7 @@ export default function App({
     >
       {navigation}
       {timerDialog}
-      <AppHeader onHome={() => void timer.pause().then(onHome)} onSettings={onSettings} />
+      <AppHeader title={folderName} />
       <main ref={main}>
         {!fullQuiz && (
           <>

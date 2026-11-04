@@ -1,3 +1,4 @@
+import { useWorkspaceNavigation } from './WorkspaceNavigation';
 import { useEffect, useRef, useState } from 'react';
 import { DEFAULT_DURATION_MS, type AttemptClock } from '../../shared/monty';
 import { advanceClock } from '../core/exams';
@@ -9,6 +10,8 @@ export function useAttemptClock(
   persist: (clock: AttemptClock) => Promise<unknown>,
   expire: (clock: AttemptClock) => Promise<unknown>,
 ) {
+  const navigation = useWorkspaceNavigation();
+  const pauseForNavigation = useRef<() => Promise<unknown>>(async () => {});
   const options = useRef({ persist, expire });
   options.current = { persist, expire };
   const live = useRef<AttemptClock | undefined>(initial),
@@ -43,6 +46,11 @@ export function useAttemptClock(
     setPaused(true);
     await flush();
   };
+  pauseForNavigation.current = pause;
+  useEffect(() => {
+    if (!id) return;
+    return navigation.registerGuard(() => pauseForNavigation.current());
+  }, [id, navigation.registerGuard]);
   const resume = async () => {
     if (!live.current || !held.current) return;
     live.current = { ...live.current, paused: false, updatedAt: Date.now() };

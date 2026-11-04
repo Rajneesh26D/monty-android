@@ -102,7 +102,11 @@ test('automatic AI, actual PDF upload, cloud restore in a fresh browser and PDF 
   expect(
     (await fresh.request.get('http://127.0.0.1:5180/api/pdfs/' + doc.id)).headers()['content-type'],
   ).toBe('application/pdf');
-  await fresh.getByRole('button', { name: 'Settings', exact: true }).click();
+  await fresh.getByRole('button', { name: 'Open navigation', exact: true }).click();
+  await fresh
+    .getByRole('dialog', { name: 'Menu', exact: true })
+    .getByRole('button', { name: 'Settings', exact: true })
+    .click();
   await expect(fresh.getByText('Backend address', { exact: true })).toHaveCount(0);
   const download = fresh.waitForEvent('download');
   await fresh.getByRole('button', { name: 'Export backup' }).click();

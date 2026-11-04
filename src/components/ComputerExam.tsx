@@ -1,3 +1,4 @@
+import { NavigationToggle } from './WorkspaceNavigation';
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { Capacitor } from '@capacitor/core';
 import {
@@ -10,7 +11,6 @@ import {
   Expand,
   FileText,
   Flag,
-  Home,
   LayoutGrid,
   Minimize,
   Pause,
@@ -205,25 +205,10 @@ export function ComputerExam({
     >
       <header className="cbt-header">
         <div className="cbt-brand">
+          <NavigationToggle className="cbt-header-button navigation-toggle" />
           <strong>Monty</strong>
-          <span>Computer based practice test</span>
         </div>
         <div className="cbt-header-tools">
-          <button
-            className="cbt-header-button cbt-home"
-            aria-label="Home"
-            title="Save attempt and return home"
-            onClick={() =>
-              void run(async () => {
-                await timer.pause();
-                onHome();
-              })
-            }
-            disabled={working}
-          >
-            <Home size={16} />
-            <span>Home</span>
-          </button>
           {document.fullscreenEnabled && (
             <button
               className="cbt-header-button cbt-fullscreen"
@@ -239,7 +224,11 @@ export function ComputerExam({
               {fullScreen ? <Minimize size={17} /> : <Expand size={17} />}
             </button>
           )}
-          <button className="cbt-header-button" onClick={() => instructions.current?.showModal()}>
+          <button
+            className="cbt-header-button cbt-instructions"
+            aria-label="Instructions"
+            onClick={() => instructions.current?.showModal()}
+          >
             <FileText size={16} />
             <span>Instructions</span>
           </button>

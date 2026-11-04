@@ -135,9 +135,6 @@
     padding-top: 32px;
     scroll-padding-block: 32px;
   }
-  .app-header {
-    height: calc(80px + env(safe-area-inset-top));
-  }
   .subject-grid,
   .folder-grid,
   .document-list,
@@ -258,9 +255,6 @@
     padding-top: 40px;
     scroll-padding-block: 40px;
   }
-  .app-header {
-    height: calc(88px + env(safe-area-inset-top));
-  }
   .folder-grid {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
@@ -311,9 +305,6 @@
 @media (max-height: 500px) {
   .app-shell {
     min-height: 0;
-  }
-  .app-header {
-    height: calc(56px + env(safe-area-inset-top));
   }
   .home-heading {
     padding-top: 8px;

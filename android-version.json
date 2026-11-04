@@ -1,5 +1,5 @@
 {
-  "versionCode": 20113,
-  "versionName": "2.1.13",
-  "notes": "Preserve sheet question and option order by default. Add independent question and option shuffle settings for each test and reattempt, alongside its custom timer. Divide sheets by the number of quizzes or exact questions per quiz, including 60 questions into four consecutive tests of 15. Saved attempts and results retain their chosen order across resume and sync."
+  "versionCode": 20114,
+  "versionName": "2.1.14",
+  "notes": "Use a compact header and a hamburger navigation drawer across web and Android. Remove duplicated Home controls and the permanently reserved sidebar column. Opening navigation pauses and saves running tests; selecting a destination closes the menu. Support outside click, Escape and Android Back to dismiss navigation."
 }

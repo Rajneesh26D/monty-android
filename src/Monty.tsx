@@ -1,3 +1,4 @@
+import { WorkspaceNavigationProvider, NavigationError } from './components/WorkspaceNavigation';
 import { useState, useEffect } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { AppHeader } from './components/AppHeader';
@@ -36,6 +37,14 @@ const labels: Record<Area, string> = {
   reading: 'PQRS / RS / CT / RC',
 };
 export default function Monty() {
+  return (
+    <WorkspaceNavigationProvider>
+      <MontyWorkspace />
+      <NavigationError />
+    </WorkspaceNavigationProvider>
+  );
+}
+function MontyWorkspace() {
   const store = useStore(),
     { state, commit, current, error } = store;
   const [subject, setSubject] = useState<'english' | 'maths' | null>(null),
@@ -357,6 +366,7 @@ export default function Monty() {
       folderId={folderId}
       settings={settings}
       home={!subject && !settings}
+      nativeBackHandled={folder?.profile === 'vocab' && !settings}
       onHome={goHome}
       onArea={goArea}
       onFolder={goFolder}
@@ -389,7 +399,14 @@ export default function Monty() {
       }
     >
       {navigation}
-      <AppHeader onHome={goHome} onSettings={() => setSettings((s) => !s)} />
+      <AppHeader
+        title={
+          settings
+            ? 'Settings'
+            : (folder?.name ??
+              (area ? labels[area] : subject === 'english' ? 'English' : 'Study library'))
+        }
+      />
       <main>
         {error && (
           <div className="notice danger" role="alert">
@@ -416,7 +433,7 @@ export default function Monty() {
         ) : !area ? (
           <>
             <button className="back-button" onClick={() => setSubject(null)}>
-              <ArrowLeft size={17} /> Home
+              <ArrowLeft size={17} /> Back
             </button>
             <h1>English</h1>
             <div className="subject-grid">

@@ -17,7 +17,7 @@ export function CloudStatus() {
   if (!cloudEnabled) return null;
   return (
     <div className="cloud-status" role="status">
-      <span>{status}</span>
+      <span title={status}>{status}</span>
       {/pending|Saved online/i.test(status) && (
         <button className="text-button" onClick={() => void syncNow()}>
           Sync now
