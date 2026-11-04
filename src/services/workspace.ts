@@ -27,7 +27,6 @@ import { extractGeneral } from './api';
 import { recoverMaths } from './mathsRecovery';
 import type { Commit, Progress } from './importer';
 import type { GeneralOutput } from '../../shared/general';
-import { mathsTests } from '../core/exams';
 const banks = new Map<string, Bank>();
 const bankLoads = new Map<string, Promise<Bank>>();
 const repairAttempts = new Map<string, number>();
@@ -320,9 +319,6 @@ async function processPractice(
       const a = s.monty!.attachments[id];
       if (!a) return s;
       const tests = { ...s.monty!.tests };
-      if (folder.area === 'maths' && !bank.warnings.length)
-        for (const test of mathsTests(bank, folder.id, id, a.name))
-          if (!tests[test.id]) tests[test.id] = test;
       return {
         ...s,
         monty: {

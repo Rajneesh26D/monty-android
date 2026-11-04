@@ -75,7 +75,6 @@ export function QuestionTracker({
   );
   return (
     <>
-      {practice && position}
       {dock &&
         createPortal(
           practice ? (

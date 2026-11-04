@@ -1,10 +1,19 @@
 import { useSyncExternalStore } from 'react';
 
-export const themeColors = ['violet', 'red', 'pink', 'yellow', 'teal'] as const;
+export const themeColors = [
+  'amoled',
+  'black',
+  'youtube',
+  'red',
+  'yellow',
+  'violet',
+  'pink',
+  'teal',
+] as const;
 export type ThemeColor = (typeof themeColors)[number];
 export type Appearance = { mode: 'dark' | 'light'; color: ThemeColor };
-const key = 'monty-appearance-v1';
-const defaultAppearance: Appearance = { mode: 'dark', color: 'violet' };
+const key = 'monty-appearance-v2';
+const defaultAppearance: Appearance = { mode: 'dark', color: 'amoled' };
 let current: Appearance = defaultAppearance;
 const listeners = new Set<() => void>();
 function read(): Appearance {
@@ -23,7 +32,7 @@ function apply() {
   document.documentElement.style.colorScheme = current.mode;
   document
     .querySelector('meta[name="theme-color"]')
-    ?.setAttribute('content', current.mode === 'dark' ? '#0e1020' : '#eef0f7');
+    ?.setAttribute('content', current.mode === 'dark' ? '#000000' : '#eef0f7');
 }
 export function initializeAppearance() {
   current = read();
@@ -36,6 +45,8 @@ export function initializeAppearance() {
   });
 }
 export function setAppearance(value: Appearance) {
+  if (value.mode === 'light' && ['amoled', 'black', 'youtube'].includes(value.color))
+    value = { ...value, color: 'violet' };
   current = value;
   try {
     localStorage.setItem(key, JSON.stringify(value));

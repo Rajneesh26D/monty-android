@@ -69,6 +69,8 @@ export interface Draft extends AttemptOrder {
   startedAt: number;
 }
 export interface QuizTest {
+  selectionNumbers?: number[];
+  durationMinutes?: number;
   customization?: QuizCustomization;
   folderId?: string;
   id: string;

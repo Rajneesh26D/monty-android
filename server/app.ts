@@ -1,10 +1,12 @@
+import { parseQuestionSelection, formatQuestionSelection } from '../shared/question-selection';
+import { inferxJSON } from './inferx';
 import { mathsRequestSchema } from '../shared/maths-extraction';
 import { mathsAI } from './maths';
 import { multipart } from './multipart';
 import { storeUpload } from './uploads';
 import { processSchema } from '../shared/validation';
 import { stateSchema } from '../shared/state-schema';
-import { APIError } from './models';
+import { APIError, PRIORITY, parseModelJSON } from './models';
 import { generalRequestSchema } from '../shared/general';
 import { generalAI } from './general';
 import { cachedAI } from './cache';
@@ -234,7 +236,79 @@ export function createWorker(assets: Assets) {
             return json({ error: 'Batch too large' }, 413);
           const text = await request.text();
           if (text.length > 8_000_000) return json({ error: 'Batch too large' }, 413);
-          const parsed = processSchema.safeParse(JSON.parse(text));
+          const raw = JSON.parse(text);
+          if (raw.mode === 'question-selection') {
+            if (
+              typeof raw.text !== 'string' ||
+              raw.text.length > 2000 ||
+              !Number.isSafeInteger(raw.total) ||
+              raw.total < 1 ||
+              raw.total > 100000
+            )
+              return json({ error: 'Invalid question selection' }, 400);
+            try {
+              return json({
+                selection: formatQuestionSelection(parseQuestionSelection(raw.text, raw.total)),
+              });
+            } catch {}
+            if (!env.INFERX_API_KEY && !env.OPENROUTER_API_KEY)
+              return json(
+                { error: 'AI interpretation is unavailable. Enter explicit numbers and ranges.' },
+                503,
+              );
+            const prompt =
+              'Interpret only a question-number selection. Return JSON {"selection":"1,2,5 to 20"}. Ranges are inclusive. Do not invent numbers. If ambiguous return {"selection":""}.';
+            let result: { selection: string };
+            if (env.INFERX_API_KEY)
+              result = (await inferxJSON(
+                prompt,
+                { text: raw.text, total: raw.total },
+                env.INFERX_API_KEY,
+              )) as { selection: string };
+            else {
+              const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  Authorization: 'Bearer ' + env.OPENROUTER_API_KEY,
+                },
+                signal: AbortSignal.timeout(45000),
+                body: JSON.stringify({
+                  model: PRIORITY[0],
+                  messages: [
+                    { role: 'system', content: prompt },
+                    { role: 'user', content: JSON.stringify({ text: raw.text, total: raw.total }) },
+                  ],
+                  max_tokens: 1000,
+                }),
+              });
+              if (!response.ok)
+                return json(
+                  { error: 'AI is busy. You can still use explicit numbers and ranges.' },
+                  503,
+                );
+              const data = (await response.json()) as any;
+              result = parseModelJSON(data.choices?.[0]?.message?.content ?? '') as {
+                selection: string;
+              };
+            }
+            try {
+              return json({
+                selection: formatQuestionSelection(
+                  parseQuestionSelection(result.selection, raw.total),
+                ),
+              });
+            } catch {
+              return json(
+                {
+                  error:
+                    'Could not interpret safely. Please use explicit question numbers and ranges.',
+                },
+                400,
+              );
+            }
+          }
+          const parsed = processSchema.safeParse(raw);
           if (!parsed.success) return json({ error: 'Invalid processing batch' }, 400);
           const input = parsed.data;
           if (

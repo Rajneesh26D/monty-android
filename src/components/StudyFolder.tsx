@@ -1,6 +1,6 @@
-import { QuizOrderControls } from './QuizOrderControls';
+import { parseQuestionSelection, formatQuestionSelection } from '../../shared/question-selection';
+import { QuestionSelection } from './QuestionSelection';
 import { defaultQuizCustomization, type QuizCustomization } from '../../shared/quiz-customization';
-import { QuizSplitControls } from './QuizSplitControls';
 import { useTestSetup } from './TestDuration';
 import { StudyNavigator } from './StudyNavigator';
 import { PdfCard } from './PdfCard';
@@ -28,8 +28,7 @@ import type { Folder, Attachment, Bank, Exam, MCQ, StudyItem } from '../../share
 import type { Commit } from '../services/importer';
 import { addPractice, importPractice, readBank, saveBank } from '../services/workspace';
 import { removeAttachment } from '../storage/repository';
-import { startExam, mathsTests, time, uniqueExamQuestions, createExamSet } from '../core/exams';
-import { validQuizSplit, quizSplitSizes, selectQuestions } from '../core/quiz';
+import { startExam, time, createExamSet } from '../core/exams';
 import { NotesPanel } from './NotesPanel';
 import { openPdfInApp } from '../services/openPdf';
 import { MCQView } from './MCQView';
@@ -58,7 +57,7 @@ export function StudyFolder({
 }) {
   const { chooseSetup, timerDialog } = useTestSetup();
   const [customization, setCustomization] = useState<QuizCustomization>(defaultQuizCustomization);
-  const [perQuiz, setPerQuiz] = useState<number | null>(null);
+  const [questionSelection, setQuestionSelection] = useState('');
   const [tab, setTab] = useState<Tab>('practice'),
     [bank, setBank] = useState<Bank | null>(null),
     [selectedPdf, setSelectedPdf] = useState<string | null>(null),
@@ -72,9 +71,6 @@ export function StudyFolder({
     [mathSaved, setMathSaved] = useState(false),
     [selection, setSelection] = useState<string[]>([]),
     [bookmarkSource, setBookmarkSource] = useState(false),
-    [count, setCount] = useState('10'),
-    [custom, setCustom] = useState(false),
-    [splits, setSplits] = useState(1),
     [limit, setLimit] = useState(30);
   const [quizSource, setQuizSource] = useState<{
     key: string;
@@ -91,6 +87,13 @@ export function StudyFolder({
       .sort((a, b) => Number(b.pinned) - Number(a.pinned) || a.createdAt - b.createdAt),
     tests = Object.values(w.tests)
       .filter((t) => t.folderId === folder.id)
+      .filter(
+        (t) =>
+          t.id !== `${t.attachmentId}-test-${t.id.split('-test-').at(-1)}` ||
+          !!t.draft ||
+          !!t.latest ||
+          !!t.selectionNumbers,
+      )
       .sort((a, b) => b.createdAt - a.createdAt),
     selected = files.find((a) => a.id === selectedPdf),
     active = w.tests[activeId ?? ''],
@@ -164,7 +167,14 @@ export function StudyFolder({
     });
   async function start(t: Exam) {
     const sourceBank = await readBank(t.bankId);
-    const setup = await chooseSetup(t.name, !!t.latest, 1, t.customization);
+    const setup = await chooseSetup(
+      t.name,
+      !!t.latest,
+      1,
+      t.customization,
+      false,
+      t.durationMinutes ?? 15,
+    );
     if (setup === null) return;
     await patchTest(t.id, (test) => startExam(test, setup.minutes, setup, sourceBank));
     setActiveId(t.id);
@@ -229,8 +239,7 @@ export function StudyFolder({
         questions = banks.flatMap((b) => b.questions);
         study = banks.flatMap((b) => b.study);
       }
-      if (!cancelled)
-        setQuizSource({ key: quizSourceKey, questions: uniqueExamQuestions(questions), study });
+      if (!cancelled) setQuizSource({ key: quizSourceKey, questions, study });
     };
     void load().catch((error) => {
       if (!cancelled)
@@ -247,29 +256,18 @@ export function StudyFolder({
   }, [tab, quizSourceKey]);
   const readyQuizSource = quizSource?.key === quizSourceKey ? quizSource : null;
   const availableQuestions = readyQuizSource?.questions.length ?? 0;
-  const requestedQuestions = Number(count);
-  const validQuestionCount =
-    Number.isInteger(requestedQuestions) &&
-    requestedQuestions >= 0 &&
-    (!custom || (!!count && requestedQuestions > 0 && requestedQuestions <= availableQuestions));
-  const selectedQuestionCount = validQuestionCount
-    ? Math.min(requestedQuestions || availableQuestions, availableQuestions)
-    : 0;
-  const validParts = validQuizSplit(selectedQuestionCount, splits, perQuiz);
-  const splitCount = validParts ? quizSplitSizes(selectedQuestionCount, splits, perQuiz).length : 0;
+  let selectedNumbers: number[] = [];
+  try {
+    selectedNumbers = parseQuestionSelection(questionSelection, availableQuestions);
+  } catch {}
   async function generate() {
     if (!readyQuizSource) throw new Error('Wait for the selected questions to load.');
     if (readyQuizSource.error) throw new Error(readyQuizSource.error);
     let questions = readyQuizSource.questions;
     const study = readyQuizSource.study;
-    const n = Number(count);
-    if (!questions.length) throw new Error('Select PDFs or bookmarks with ready questions.');
-    if (!Number.isInteger(n) || n < 0 || (custom && (n < 1 || n > questions.length)))
-      throw new Error(`Choose 1–${questions.length} questions, or All.`);
-    questions = selectQuestions(questions, n);
-    if (!validQuizSplit(questions.length, splits, perQuiz))
-      throw new Error(`Choose between 1 and ${questions.length} quizzes.`);
-    const setup = await chooseSetup('New quiz', false, splitCount, customization);
+    const numbers = parseQuestionSelection(questionSelection, questions.length);
+    questions = numbers.map((n) => questions[n - 1]);
+    const setup = await chooseSetup('Selected questions', false, 1, customization, true);
     if (setup === null) return;
     const id = 'bank-' + uid(),
       combined: Bank = { version: 1, id, kind: 'general', questions, study, warnings: [] };
@@ -291,9 +289,9 @@ export function StudyFolder({
         source: bookmarkSource ? 'bookmarks' : selection.length > 1 ? 'combined' : 'pdf',
       },
       questions,
-      splits,
-      perQuiz,
-      customization,
+      1,
+      null,
+      setup,
     );
     await commit((s) => ({
       ...s,
@@ -308,13 +306,13 @@ export function StudyFolder({
           ...Object.fromEntries(
             generated.map((t, i) => [
               t.id,
-              i === 0 ? startExam(t, setup.minutes, setup, combined) : t,
+              { ...t, selectionNumbers: numbers, durationMinutes: setup.minutes },
             ]),
           ),
         },
       },
     }));
-    setActiveId(generated[0].id);
+    notify('Test created. Start it when you are ready.');
     setBank(combined);
     setResultId(null);
   }
@@ -332,7 +330,14 @@ export function StudyFolder({
       <div className="card-heading">
         <div>
           <h3>{t.name}</h3>
-          <p className="muted">{t.questionIds.length} questions · 15 min default · customizable</p>
+          {t.selectionNumbers && (
+            <p className="test-question-range">
+              Questions {formatQuestionSelection(t.selectionNumbers)}
+            </p>
+          )}
+          <p className="muted">
+            {t.questionIds.length} questions · {t.durationMinutes ?? 15} min
+          </p>
           {t.draft && <small>Paused · {time(t.draft.clock.remainingMs)} remaining</small>}
         </div>
         <button
@@ -531,15 +536,16 @@ export function StudyFolder({
         ) : tab === 'practice' ? (
           selectedPdf && selected && bank ? (
             <>
-              <div className="page-heading">
-                <button className="back-button" onClick={() => setSelectedPdf(null)}>
-                  <ArrowLeft size={17} /> PDFs
+              <div className="practice-sheet-toolbar">
+                <button
+                  className="back-button"
+                  aria-label="Back to practice sheets"
+                  onClick={() => setSelectedPdf(null)}
+                >
+                  <ArrowLeft size={18} />
                 </button>
-                <button className="text-button" onClick={() => void openPdfInApp(selected, notify)}>
-                  Original PDF
-                </button>
+                <span title={selected.name}>{selected.name}</span>
               </div>
-              <h1 className="source-title">{selected.name}</h1>
               {bank.study.length > 0 && (
                 <div className="segmented">
                   <button
@@ -764,13 +770,10 @@ export function StudyFolder({
                       .map((f) => (
                         <label className="pdf-check" key={f.id}>
                           <input
-                            type="checkbox"
+                            type="radio"
+                            name="quiz-sheet"
                             checked={selection.includes(f.id)}
-                            onChange={(e) =>
-                              setSelection((s) =>
-                                e.target.checked ? [...s, f.id] : s.filter((id) => id !== f.id),
-                              )
-                            }
+                            onChange={(e) => setSelection(e.target.checked ? [f.id] : [])}
                           />
                           <span>
                             {f.name}
@@ -780,72 +783,17 @@ export function StudyFolder({
                       ))}
                   </div>
                 )}
-                <label className="field-label">Total questions to use</label>
-                <div className="segmented counts">
-                  {['10', '20', '0'].map((n) => (
-                    <button
-                      key={n}
-                      className={!custom && count === n ? 'selected' : ''}
-                      onClick={() => {
-                        setCustom(false);
-                        setCount(n);
-                      }}
-                    >
-                      {n === '0' ? 'All' : n}
-                    </button>
-                  ))}
-                  <button
-                    className={custom ? 'selected' : ''}
-                    onClick={() => {
-                      setCustom(true);
-                      setCount('');
-                    }}
-                  >
-                    Custom
-                  </button>
-                </div>
-                {custom && (
-                  <label className="field">
-                    Custom questions
-                    <input
-                      type="number"
-                      min={1}
-                      step={1}
-                      value={count}
-                      onChange={(e) => setCount(e.target.value)}
-                    />
-                  </label>
-                )}
-                <p className="muted selection-total" role="status">
-                  {readyQuizSource
-                    ? `${availableQuestions} unique questions available · ${selectedQuestionCount} selected`
-                    : 'Loading selected questions…'}
-                </p>
-                {readyQuizSource?.error && (
-                  <p className="notice danger" role="alert">
-                    {readyQuizSource.error}
-                  </p>
-                )}
-                <QuizOrderControls value={customization} onChange={setCustomization} />
-                <QuizSplitControls
-                  total={selectedQuestionCount}
-                  parts={splits}
-                  onChange={setSplits}
-                  perQuiz={perQuiz}
-                  onPerQuizChange={setPerQuiz}
+                <QuestionSelection
+                  total={availableQuestions}
+                  value={questionSelection}
+                  onChange={setQuestionSelection}
                 />
-                <p className="muted">Choose your timer before starting · 15 minutes by default</p>
                 <button
                   className="primary full"
-                  disabled={
-                    !readyQuizSource ||
-                    !!readyQuizSource.error ||
-                    !validQuestionCount ||
-                    !validParts
-                  }
+                  disabled={!readyQuizSource || !!readyQuizSource.error || !selectedNumbers.length}
                   onClick={() => void act(generate)}
                 >
-                  {splitCount > 1 ? `Create ${splitCount} tests & start` : 'Generate & start'}
+                  Create test
                 </button>
               </section>
               {!math && (
@@ -861,13 +809,11 @@ export function StudyFolder({
                   return (
                     <section key={file.id} className="pdf-test-group">
                       <h2>{file.name}</h2>
-                      <p className="muted">
-                        {group.length} saved tests · create your own split above
-                      </p>
+                      <p className="muted">{group.length} saved tests</p>
                       {group.map(testCard)}
                       {!group.length && (
                         <p className="notice">
-                          Finish importing and reviewing this PDF to create its tests.
+                          Choose question numbers above to save your first test.
                         </p>
                       )}
                     </section>
@@ -876,7 +822,7 @@ export function StudyFolder({
                 {tests.filter((t) => !files.some((f) => f.id === t.attachmentId)).map(testCard)}
                 {!tests.length && !files.length && (
                   <p className="empty-state">
-                    Add a PDF in Practice. Its tests appear here automatically.
+                    Add a sheet in Practice, then choose its questions here.
                   </p>
                 )}
               </>
@@ -926,12 +872,6 @@ export function StudyFolder({
             await saveBank(next);
             await commit((s) => {
               const tests = { ...s.monty!.tests };
-              if (math)
-                for (const t of mathsTests(next, folder.id, review.id, review.name)) {
-                  const id =
-                    tests[t.id] && tests[t.id].bankId !== next.id ? t.id + '-' + next.id : t.id;
-                  tests[id] = { ...t, id };
-                }
               return {
                 ...s,
                 monty: {
@@ -1009,7 +949,7 @@ function PracticeQuestions({
     document.querySelector('main')?.scrollTo({ top: 0 });
   };
   return (
-    <>
+    <section className="practice-reader">
       <QuestionTracker
         practice
         ids={bank.questions.map((q) => q.id)}
@@ -1023,7 +963,6 @@ function PracticeQuestions({
         onNavigate={move}
       />
       <div className="question-meta">
-        <span className="eyebrow">Practice · progress saves automatically</span>
         <button
           className="icon-button bookmark"
           aria-label={saved(q) ? 'Remove practice bookmark' : 'Bookmark practice question'}
@@ -1067,6 +1006,6 @@ function PracticeQuestions({
           Next <ArrowRight size={16} />
         </button>
       </div>
-    </>
+    </section>
   );
 }

@@ -25,8 +25,9 @@ export function createTest(
   sourceNames: string[],
   count: number,
   customization: QuizCustomization = defaultQuizCustomization,
+  preserveEntries = false,
 ): QuizTest {
-  const pool = quizPool(entries);
+  const pool = preserveEntries ? entries.filter(canQuiz) : quizPool(entries);
   if (!Number.isInteger(count) || count < 0) throw new Error('Enter a whole number of questions.');
   if (!pool.length)
     throw new Error('No words with valid synonym and antonym options. Complete an import first.');

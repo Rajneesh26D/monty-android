@@ -1,7 +1,7 @@
+import { parseQuestionSelection, formatQuestionSelection } from '../shared/question-selection';
+import { QuestionSelection } from './components/QuestionSelection';
 import { useWorkspaceNavigation } from './components/WorkspaceNavigation';
-import { QuizOrderControls } from './components/QuizOrderControls';
 import { defaultQuizCustomization, type QuizCustomization } from '../shared/quiz-customization';
-import { QuizSplitControls } from './components/QuizSplitControls';
 import { useTestSetup } from './components/TestDuration';
 import { StudyNavigator } from './components/StudyNavigator';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
@@ -37,16 +37,7 @@ import { removePdf } from './storage/repository';
 import { exportBackup, importBackup } from './storage/backup';
 import { addDocument, processDocument, repairSourceDocuments } from './services/importer';
 import { canQuiz, needsEnrichment } from './core/vocabulary';
-import {
-  createTest,
-  startAttempt,
-  finishAttempt,
-  shuffle,
-  quizPool,
-  validQuizSplit,
-  quizSplitSizes,
-  splitTest,
-} from './core/quiz';
+import { createTest, startAttempt, finishAttempt, shuffle, quizPool } from './core/quiz';
 import { WordCard, BookmarkButton } from './components/WordCard';
 import { Choices } from './components/Question';
 import { Analysis } from './components/Analysis';
@@ -87,7 +78,7 @@ export default function App({
 }) {
   const { chooseSetup, timerDialog } = useTestSetup();
   const [customization, setCustomization] = useState<QuizCustomization>(defaultQuizCustomization);
-  const [perQuiz, setPerQuiz] = useState<number | null>(null);
+  const [questionSelection, setQuestionSelection] = useState('');
   const { state, commit, error, current } = store;
   const navigationDrawer = useWorkspaceNavigation();
   const [tab, setTab] = useState<Tab>('library'),
@@ -99,11 +90,7 @@ export default function App({
     [learnOrder, setLearnOrder] = useState<string[] | null>(null),
     [learnLimit, setLearnLimit] = useState(30);
   const [selected, setSelected] = useState<string[]>([]),
-    [bookmarkSource, setBookmarkSource] = useState(false),
-    [count, setCount] = useState(10),
-    [useCustom, setUseCustom] = useState(false),
-    [customCount, setCustomCount] = useState(''),
-    [splits, setSplits] = useState(1);
+    [bookmarkSource, setBookmarkSource] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null),
     [analysisId, setAnalysisId] = useState<string | null>(null),
     [resultId, setResultId] = useState<string | null>(null),
@@ -233,7 +220,14 @@ export default function App({
     setSelected((ids) => ids.filter((x) => x !== id));
   }
   async function begin(test: QuizTest) {
-    const setup = await chooseSetup(test.name, !!test.latest, 1, test.customization);
+    const setup = await chooseSetup(
+      test.name,
+      !!test.latest,
+      1,
+      test.customization,
+      false,
+      test.durationMinutes ?? 15,
+    );
     if (setup === null) return;
     const started = startAttempt(test, setup.minutes, setup);
     await commit((s) => ({ ...s, tests: s.tests.map((t) => (t.id === test.id ? started : t)) }));
@@ -254,31 +248,24 @@ export default function App({
       : docs.length > 1
         ? `Combined · ${docs.length} PDFs`
         : docs[0].name;
+    const pool = entries;
+    const numbers = parseQuestionSelection(questionSelection, pool.length);
+    if (numbers.some((n) => !canQuiz(pool[n - 1])))
+      throw new Error('Some selected words are not ready for a quiz. Complete their import first.');
+    const setup = await chooseSetup(name, false, 1, customization, true);
+    if (setup === null) return;
     const test = createTest(
-      entries,
+      numbers.map((n) => pool[n - 1]),
       name,
       source,
       docs.map((d) => d.name),
-      useCustom ? Number(customCount) : count,
-      customization,
+      0,
+      setup,
+      true,
     );
-    if (
-      useCustom &&
-      (!customCount ||
-        !Number.isInteger(Number(customCount)) ||
-        Number(customCount) < 1 ||
-        Number(customCount) > quizPool(entries).length)
-    )
-      throw new Error(`Choose between 1 and ${quizPool(entries).length} questions.`);
-    const parts = splits;
-    if (!validQuizSplit(test.questions.length, parts, perQuiz))
-      throw new Error(`Choose between 1 and ${test.questions.length} quizzes.`);
-    const groups = splitTest(test, parts, perQuiz);
-    const setup = await chooseSetup(test.name, false, groups.length, customization);
-    if (setup === null) return;
-    const generated = groups.map((t, i) => (i === 0 ? startAttempt(t, setup.minutes, setup) : t));
+    const generated = [{ ...test, selectionNumbers: numbers, durationMinutes: setup.minutes }];
     await commit((s) => ({ ...s, tests: [...generated, ...s.tests] }));
-    setActiveId(generated[0].id);
+    setToast('Test created. Start it when you are ready.');
     setResultId(null);
     setAnalysisId(null);
   }
@@ -365,23 +352,15 @@ export default function App({
     result = state.tests.find((t) => t.id === resultId);
   const fullQuiz = !!active?.draft;
   const selectedDocs = state.documents.filter((d) => selected.includes(d.id));
-  const available = quizPool(
-    (bookmarkSource ? state.bookmarks : [...new Set(selectedDocs.flatMap((d) => d.entryIds))])
-      .map((id) => state.entries[id])
-      .filter(Boolean),
-  );
-  const requested = useCustom ? Number(customCount) : count;
-  const total = Math.min(requested || available.length, available.length);
-  const splitCount = validQuizSplit(total, splits, perQuiz)
-    ? quizSplitSizes(total, splits, perQuiz).length
-    : 0;
-  const validCount =
-    !useCustom ||
-    (!!customCount &&
-      Number.isInteger(requested) &&
-      requested >= 1 &&
-      requested <= available.length);
-  const validParts = validQuizSplit(total, splits, perQuiz);
+  const available = (
+    bookmarkSource ? state.bookmarks : [...new Set(selectedDocs.flatMap((d) => d.entryIds))]
+  )
+    .map((id) => state.entries[id])
+    .filter(Boolean);
+  let validSelection = false;
+  try {
+    validSelection = parseQuestionSelection(questionSelection, available.length).length > 0;
+  } catch {}
   const notify = (message: string) => setToast(message);
   const testCard = (test: QuizTest) => (
     <article className="test-card" key={test.id}>
@@ -398,8 +377,14 @@ export default function App({
           </span>
           <div>
             <h3>{test.name}</h3>
+            {test.selectionNumbers && (
+              <p className="test-question-range">
+                Questions {formatQuestionSelection(test.selectionNumbers)}
+              </p>
+            )}
             <p className="muted">
-              {test.questions.length} words · {date(test.createdAt)}
+              {test.questions.length} questions · {test.durationMinutes ?? 15} min ·{' '}
+              {date(test.createdAt)}
             </p>
           </div>
         </div>
@@ -936,31 +921,14 @@ export default function App({
                   <div className="pdf-checklist">
                     {state.documents.length ? (
                       <>
-                        <div className="checklist-top">
-                          <span>Select PDFs to combine</span>
-                          <button
-                            className="text-button"
-                            onClick={() =>
-                              setSelected(
-                                selected.length === state.documents.length
-                                  ? []
-                                  : state.documents.map((d) => d.id),
-                              )
-                            }
-                          >
-                            {selected.length === state.documents.length ? 'Clear' : 'Select all'}
-                          </button>
-                        </div>
+                        <p className="muted">Choose a practice sheet</p>
                         {state.documents.map((d) => (
                           <label className="pdf-check" key={d.id}>
                             <input
-                              type="checkbox"
+                              type="radio"
+                              name="quiz-sheet"
                               checked={selected.includes(d.id)}
-                              onChange={(e) =>
-                                setSelected((s) =>
-                                  e.target.checked ? [...s, d.id] : s.filter((id) => id !== d.id),
-                                )
-                              }
+                              onChange={(e) => setSelected(e.target.checked ? [d.id] : [])}
                             />
                             <span>
                               {d.name}
@@ -981,59 +949,17 @@ export default function App({
                     )}
                   </div>
                 )}
-                <label className="field-label">Total questions to use</label>
-                <div className="segmented counts">
-                  {[10, 20, 0].map((n) => (
-                    <button
-                      key={n}
-                      className={!useCustom && count === n ? 'selected' : ''}
-                      onClick={() => {
-                        setUseCustom(false);
-                        setCount(n);
-                      }}
-                    >
-                      {n || 'All'}
-                    </button>
-                  ))}
-                  <button
-                    className={useCustom ? 'selected' : ''}
-                    onClick={() => setUseCustom(true)}
-                  >
-                    Custom
-                  </button>
-                </div>
-                {useCustom && (
-                  <label className="field">
-                    Custom questions
-                    <input
-                      type="number"
-                      inputMode="numeric"
-                      min="1"
-                      max={available.length}
-                      step="1"
-                      placeholder={`1–${available.length}`}
-                      value={customCount}
-                      onChange={(e) => setCustomCount(e.target.value)}
-                    />
-                  </label>
-                )}
-                <p className="muted selection-total">
-                  {available.length} unique words available · {validCount ? total : 0} selected
-                </p>
-                <QuizOrderControls value={customization} onChange={setCustomization} />
-                <QuizSplitControls
-                  total={validCount ? total : 0}
-                  parts={splits}
-                  onChange={setSplits}
-                  perQuiz={perQuiz}
-                  onPerQuizChange={setPerQuiz}
+                <QuestionSelection
+                  total={available.length}
+                  value={questionSelection}
+                  onChange={setQuestionSelection}
                 />
                 <button
                   className="primary full"
-                  disabled={!available.length || !validCount || !validParts}
+                  disabled={!available.length || !validSelection}
                   onClick={() => void act(generate)}
                 >
-                  {splitCount > 1 ? `Create ${splitCount} tests & start` : 'Generate & start'}{' '}
+                  Create test
                   <ArrowRight size={17} />
                 </button>
               </section>

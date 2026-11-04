@@ -11,6 +11,7 @@ export function useTestSetup() {
     name: string;
     reattempt: boolean;
     count: number;
+    saveOnly: boolean;
   } | null>(null);
   const [minutes, setMinutes] = useState(String(DEFAULT_TIMER_MINUTES));
   const [customization, setCustomization] = useState<QuizCustomization>(defaultQuizCustomization);
@@ -35,11 +36,13 @@ export function useTestSetup() {
     reattempt = false,
     count = 1,
     initial: QuizCustomization = defaultQuizCustomization,
+    saveOnly = false,
+    initialMinutes = DEFAULT_TIMER_MINUTES,
   ): Promise<TestSetup | null> {
     resolver.current?.(null);
-    setMinutes(String(DEFAULT_TIMER_MINUTES));
+    setMinutes(String(initialMinutes));
     setCustomization({ ...initial });
-    setRequest({ name, reattempt, count });
+    setRequest({ name, reattempt, count, saveOnly });
     return new Promise((resolve) => {
       resolver.current = resolve;
     });
@@ -75,7 +78,11 @@ export function useTestSetup() {
             </button>
           </div>
           <h2 id="timer-title">
-            {request.reattempt ? 'Set your reattempt timer' : 'Set your test timer'}
+            {request.saveOnly
+              ? 'Save your test'
+              : request.reattempt
+                ? 'Set your reattempt timer'
+                : 'Set your test timer'}
           </h2>
           <p className="muted timer-test-name">{request.name}</p>
           <p>Start with 15 minutes, or choose the time you need.</p>
@@ -118,7 +125,11 @@ export function useTestSetup() {
               Cancel
             </button>
             <button type="submit" className="primary">
-              {request.reattempt ? 'Start reattempt' : 'Start test'}
+              {request.saveOnly
+                ? 'Create test'
+                : request.reattempt
+                  ? 'Start reattempt'
+                  : 'Start test'}
             </button>
           </div>
         </form>

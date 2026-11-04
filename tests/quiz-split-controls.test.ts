@@ -61,11 +61,11 @@ it.each(['maths', 'grammar', 'reading', 'vocab'] as const)(
         onHome: vi.fn(),
       }),
     );
-    expect(html).toContain('aria-label="Split tests"');
-    expect(html).toContain('Custom number of quizzes');
-    expect(html).toContain('Shuffle questions');
-    expect(html).toContain('Shuffle answer options');
-    expect(html).toContain('aria-label="Quiz split method"');
+    expect(html).toContain('Choose questions');
+    expect(html).not.toContain('aria-label="Split tests"');
+    expect(html).toContain('Interpret with AI');
+    expect(html).toContain('Create test');
+    expect(html).not.toContain('Generate &amp; start');
     expect(html).toContain('Single PDF');
   },
 );
@@ -95,10 +95,10 @@ it('renders split controls in the separate synonym/antonym vocabulary screen wit
       onSettings: vi.fn(),
     }),
   );
-  expect(html).toContain('aria-label="Split tests"');
-  expect(html).toContain('Custom number of quizzes');
-  expect(html).toContain('Shuffle questions');
-  expect(html).toContain('Shuffle answer options');
+  expect(html).toContain('Choose questions');
+  expect(html).not.toContain('aria-label="Split tests"');
+  expect(html).toContain('Interpret with AI');
+  expect(html).toContain('Create test');
 });
 
 it('shows independent shuffle checkboxes, both off by default', () => {
@@ -145,8 +145,9 @@ it('renders the same split controls in an Idioms folder', () => {
       onHome: vi.fn(),
     }),
   );
-  expect(html).toContain('aria-label="Split tests"');
-  expect(html).toContain('Custom number of quizzes');
+  expect(html).toContain('Choose questions');
+  expect(html).not.toContain('aria-label="Split tests"');
+  expect(html).toContain('Interpret with AI');
 });
 
 it('previews four groups of 25 and accepts custom counts beyond five', () => {

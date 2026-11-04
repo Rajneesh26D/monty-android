@@ -7,9 +7,7 @@ export function AppearanceSettings() {
     <section className="panel appearance-panel">
       <span className="eyebrow">Make Monty yours</span>
       <h2>Appearance</h2>
-      <p className="muted">
-        Choose your display and accent color. Your choice stays saved on this device.
-      </p>
+      <p className="muted">Choose a complete theme. Your choice stays saved on this device.</p>
       <div className="appearance-modes" role="group" aria-label="Display mode">
         {(['dark', 'light'] as const).map((mode) => (
           <button
@@ -24,20 +22,32 @@ export function AppearanceSettings() {
           </button>
         ))}
       </div>
-      <span className="field-label">Accent color</span>
-      <div className="theme-options" role="group" aria-label="Accent color">
+      <span className="field-label">Theme preset</span>
+      <div className="theme-options" role="group" aria-label="Theme presets">
         {themeColors.map((color) => (
           <button
             key={color}
             data-swatch={color}
             aria-pressed={appearance.color === color}
             className={appearance.color === color ? 'selected' : ''}
-            onClick={() => setAppearance({ ...appearance, color })}
+            onClick={() =>
+              setAppearance({
+                ...appearance,
+                color,
+                mode: ['amoled', 'black', 'youtube'].includes(color) ? 'dark' : appearance.mode,
+              })
+            }
           >
             <span className="theme-swatch">
               {appearance.color === color && <Check size={17} />}
             </span>
-            <span>{color[0].toUpperCase() + color.slice(1)}</span>
+            <span>
+              {color === 'amoled'
+                ? 'AMOLED'
+                : color === 'youtube'
+                  ? 'YouTube'
+                  : color[0].toUpperCase() + color.slice(1)}
+            </span>
           </button>
         ))}
       </div>

@@ -58,10 +58,6 @@ export function HomeDashboard({
             <br />
             Pick a topic and make it yours.
           </p>
-          <div className="hero-meta">
-            <Check size={15} />
-            Your progress saves as you go
-          </div>
         </div>
         <div className="hero-art" aria-hidden="true">
           <span className="hero-circle" />

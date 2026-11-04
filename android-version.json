@@ -1,5 +1,5 @@
 {
-  "versionCode": 20114,
-  "versionName": "2.1.14",
-  "notes": "Use a compact header and a hamburger navigation drawer across web and Android. Remove duplicated Home controls and the permanently reserved sidebar column. Opening navigation pauses and saves running tests; selecting a destination closes the menu. Support outside click, Escape and Android Back to dismiss navigation."
+  "versionCode": 20115,
+  "versionName": "2.1.15",
+  "notes": "Create saved tests from exact question numbers and mixed ranges, with AI interpretation and a customizable timer. Tests start only when you choose Start. Remove automatic quiz splitting and generation. Redesigned study screens with compact controls, more question space, and AMOLED, black, YouTube, red, yellow, violet, pink and teal themes."
 }

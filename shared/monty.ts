@@ -105,6 +105,8 @@ export const examSchema = z.object({
   source: z.enum(['pdf', 'combined', 'bookmarks']).default('pdf'),
   questionIds: z.array(z.string()).min(1),
   customization: quizCustomizationSchema.optional(),
+  selectionNumbers: z.array(z.number().int().positive()).optional(),
+  durationMinutes: z.number().int().min(1).max(525600).optional(),
   createdAt: z.number(),
   draft: z
     .object({

@@ -38,6 +38,8 @@ const quiz = z.object({
   sourceNames: z.array(z.string()),
   questions: z.array(question).min(1),
   customization: quizCustomizationSchema.optional(),
+  selectionNumbers: z.array(z.number().int().positive()).optional(),
+  durationMinutes: z.number().int().min(1).max(525600).optional(),
   latest: z
     .object({
       completedAt: z.number(),
