@@ -1,3 +1,5 @@
+import { lookupWord } from './reading';
+import { lookupRequestSchema } from '../shared/reading';
 import { parseQuestionSelection, formatQuestionSelection } from '../shared/question-selection';
 import { inferxJSON } from './inferx';
 import { mathsRequestSchema } from '../shared/maths-extraction';
@@ -112,7 +114,12 @@ export function createWorker(assets: Assets) {
             result.data.settings.backendUrl = '';
             const old = await env.BUCKET.get('owner/library.json');
             if (old) {
-              const previous = (await old.json()) as { version: number };
+              const previous = (await old.json()) as { version: number; reading?: unknown };
+              if (previous.reading && !result.data.reading)
+                return json(
+                  { error: 'Refresh Monty or update Android to keep your article library.' },
+                  409,
+                );
               if (previous.version === 2 && result.data.version !== 2)
                 return json(
                   { error: 'Monty has been updated. Refresh this page to keep all your progress.' },
@@ -237,6 +244,12 @@ export function createWorker(assets: Assets) {
           const text = await request.text();
           if (text.length > 8_000_000) return json({ error: 'Batch too large' }, 413);
           const raw = JSON.parse(text);
+          if (raw.mode === 'article-word') {
+            const input = lookupRequestSchema.safeParse(raw);
+            if (!input.success)
+              return json({ error: 'Select a single English word from the article.' }, 400);
+            return json(await lookupWord(input.data, env.OPENROUTER_API_KEY, env.BUCKET));
+          }
           if (raw.mode === 'question-selection') {
             if (
               typeof raw.text !== 'string' ||

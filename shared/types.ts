@@ -83,6 +83,7 @@ export interface QuizTest {
   draft?: Draft;
 }
 export interface State {
+  reading?: import('./reading').ReadingLibrary;
   version: 1 | 2;
   monty?: Workspace;
   documents: Document[];

@@ -1,5 +1,5 @@
 {
-  "versionCode": 20115,
-  "versionName": "2.1.15",
-  "notes": "Create saved tests from exact question numbers and mixed ranges, with AI interpretation and a customizable timer. Tests start only when you choose Start. Remove automatic quiz splitting and generation. Redesigned study screens with compact controls, more question space, and AMOLED, black, YouTube, red, yellow, violet, pink and teal themes."
+  "versionCode": 20116,
+  "versionName": "2.1.16",
+  "notes": "Read imported text and HTML articles inside Monty. Switch between Midnight, Paper, Slate, Ink & Gold and Editorial reading themes from the top bar. Long-press words for English and Hindi meanings, three synonyms and three antonyms; save them to your vocabulary. Articles and saved words work with existing library sync and backups. No API-key setup required."
 }

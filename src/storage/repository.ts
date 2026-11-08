@@ -257,6 +257,8 @@ const initialMeta = (): CloudMeta => ({ etag: null, dirty: false, seq: 0, pdfs: 
 function hasLibraryData(s: State) {
   const defaults = upgradeState(emptyState()).monty!.folders;
   return !!(
+    Object.keys(s.reading?.articles ?? {}).length ||
+    Object.keys(s.reading?.words ?? {}).length ||
     s.documents.length ||
     Object.keys(s.entries).length ||
     s.tests.length ||

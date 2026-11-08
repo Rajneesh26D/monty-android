@@ -34,7 +34,11 @@ export async function createBackup(state: State) {
   }
   if (state.monty) {
     const ids = [
-      ...new Set([...Object.keys(state.monty.attachments), ...Object.keys(state.monty.banks)]),
+      ...new Set([
+        ...Object.keys(state.monty.attachments),
+        ...Object.keys(state.monty.banks),
+        ...Object.keys(state.reading?.articles ?? {}),
+      ]),
     ];
     let total = Object.values(files).reduce((n, f) => n + f.length, 0);
     for (const id of ids) {
@@ -87,14 +91,18 @@ export async function importBackup(file: File): Promise<State> {
   }
   if (state.monty)
     for (const id of [
-      ...new Set([...Object.keys(state.monty.attachments), ...Object.keys(state.monty.banks)]),
+      ...new Set([
+        ...Object.keys(state.monty.attachments),
+        ...Object.keys(state.monty.banks),
+        ...Object.keys(state.reading?.articles ?? {}),
+      ]),
     ]) {
       const bytes = files['files/' + id];
       if (!bytes) throw new Error('Backup is missing an attachment or question bank.');
       await saveAttachment(
         id,
         bytes,
-        state.monty.banks[id]
+        state.monty.banks[id] || state.reading?.articles[id]
           ? 'application/json'
           : (state.monty.attachments[id]?.mime ?? 'application/octet-stream'),
       );

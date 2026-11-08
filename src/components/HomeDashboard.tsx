@@ -15,11 +15,13 @@ export function HomeDashboard({
   state,
   onEnglish,
   onMaths,
+  onArticles,
   onFolder,
 }: {
   state: State;
   onEnglish: () => void;
   onMaths: () => void;
+  onArticles?: () => void;
   onFolder: (folder: StudyFolder) => void;
 }) {
   const w = state.monty!,
@@ -121,6 +123,22 @@ export function HomeDashboard({
           <ArrowUpRight className="subject-arrow" size={23} />
         </button>
       </div>
+      {onArticles && (
+        <button
+          className="category-card"
+          style={{ width: '100%', marginTop: 16, textAlign: 'left' }}
+          onClick={onArticles}
+        >
+          <BookOpen size={23} />
+          <div>
+            <strong>Article reading</strong>
+            <p style={{ margin: '4px 0 0', fontSize: 13 }}>
+              Read, discover meanings, save new words.
+            </p>
+          </div>
+          <ArrowUpRight size={20} />
+        </button>
+      )}
       {latest.length > 0 && (
         <section className="dashboard-topics">
           <div className="dashboard-section-heading">

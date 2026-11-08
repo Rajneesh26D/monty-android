@@ -14,6 +14,7 @@ export function WorkspaceNav({
   settings,
   home,
   onHome,
+  onArticles,
   onArea,
   onFolder,
   onSettings,
@@ -25,6 +26,7 @@ export function WorkspaceNav({
   settings: boolean;
   home: boolean;
   onHome: () => void;
+  onArticles?: () => void;
   onArea: (area: Area) => void;
   onFolder: (folder: Folder) => void;
   onSettings: () => void;
@@ -137,6 +139,13 @@ export function WorkspaceNav({
             <Home size={19} />
             Home
           </button>
+          {onArticles && (
+            <button onClick={() => navigate(onArticles)}>
+              <BookOpen size={19} />
+              Articles & saved words
+              <ChevronRight size={14} className="nav-chevron" />
+            </button>
+          )}
           {(
             [
               ['grammar', 'Grammar', BookOpen],

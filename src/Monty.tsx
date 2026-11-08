@@ -1,3 +1,4 @@
+import { ArticleReading } from './components/ArticleReading';
 import { WorkspaceNavigationProvider, NavigationError } from './components/WorkspaceNavigation';
 import { useState, useEffect } from 'react';
 import { Capacitor } from '@capacitor/core';
@@ -47,6 +48,7 @@ export default function Monty() {
 function MontyWorkspace() {
   const store = useStore(),
     { state, commit, current, error } = store;
+  const [articlesOpen, setArticlesOpen] = useState(false);
   const [subject, setSubject] = useState<'english' | 'maths' | null>(null),
     [area, setArea] = useState<Area | null>(null),
     [folderId, setFolderId] = useState<string | null>(null),
@@ -342,6 +344,7 @@ function MontyWorkspace() {
     </div>
   );
   const goHome = () => {
+    setArticlesOpen(false);
     setSubject(null);
     setArea(null);
     setFolderId(null);
@@ -367,12 +370,15 @@ function MontyWorkspace() {
       settings={settings}
       home={!subject && !settings}
       nativeBackHandled={folder?.profile === 'vocab' && !settings}
+      onArticles={() => setArticlesOpen(true)}
       onHome={goHome}
       onArea={goArea}
       onFolder={goFolder}
       onSettings={() => setSettings(true)}
     />
   );
+  if (articlesOpen)
+    return <ArticleReading state={state} commit={commit} onBack={() => setArticlesOpen(false)} />;
   if (folder?.profile === 'vocab' && !settings)
     return (
       <>
@@ -427,6 +433,7 @@ function MontyWorkspace() {
               setSubject('english');
               setArea(null);
             }}
+            onArticles={() => setArticlesOpen(true)}
             onMaths={() => goArea('maths')}
             onFolder={goFolder}
           />
@@ -437,6 +444,11 @@ function MontyWorkspace() {
             </button>
             <h1>English</h1>
             <div className="subject-grid">
+              <button className="category-card" onClick={() => setArticlesOpen(true)}>
+                <BookOpen size={23} />
+                <strong>Articles & saved words</strong>
+                <ChevronRight size={19} />
+              </button>
               {(['grammar', 'vocab', 'reading'] as Area[]).map((a) => (
                 <button className="category-card" key={a} onClick={() => setArea(a)}>
                   <BookOpen size={23} />

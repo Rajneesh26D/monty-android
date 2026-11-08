@@ -1,3 +1,4 @@
+import { readingSchema } from './reading';
 import { workspaceSchema, clockSchema } from './monty';
 import { attemptOrderFields, quizCustomizationSchema } from './quiz-customization';
 import { z } from 'zod';
@@ -67,6 +68,7 @@ const quiz = z.object({
     .optional(),
 });
 export const stateSchema = z.object({
+  reading: readingSchema.optional(),
   version: z.union([z.literal(1), z.literal(2)]),
   monty: workspaceSchema.optional(),
   documents: z.array(

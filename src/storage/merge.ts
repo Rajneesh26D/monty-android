@@ -105,6 +105,22 @@ export function mergeCloudState(base: State | undefined, local: State, remote: S
     ...(local.monty && remote.monty
       ? { monty: mergeWorkspace(base?.monty, local.monty, remote.monty) }
       : {}),
+    ...(local.reading || remote.reading
+      ? {
+          reading: {
+            articles: maps(
+              base?.reading?.articles,
+              local.reading?.articles ?? remote.reading?.articles ?? {},
+              remote.reading?.articles ?? local.reading?.articles ?? {},
+            ),
+            words: maps(
+              base?.reading?.words,
+              local.reading?.words ?? remote.reading?.words ?? {},
+              remote.reading?.words ?? local.reading?.words ?? {},
+            ),
+          },
+        }
+      : {}),
     documents: records(base?.documents, local.documents, remote.documents).map((d) => ({
       ...d,
       entryIds: d.entryIds.filter((id) => available.has(id)),
