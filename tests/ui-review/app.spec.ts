@@ -184,9 +184,12 @@ for (const mode of ['dark', 'light'])
       await review(page, info, 'empty-library');
       await page.getByRole('button', { name: 'Add article', exact: true }).click();
       await review(page, info, 'import-dialog');
-      const dialog = page.getByRole('dialog', { name: 'Add an article' });
+      const dialog = page.locator('dialog.reader-import[open]');
+      await expect(
+        dialog.getByRole('heading', { name: 'Add an article', exact: true }),
+      ).toBeVisible();
       await dialog.getByLabel('Title', { exact: true }).fill('The power of small habits');
-      await dialog.getByLabel('Format', { exact: true }).selectOption('html');
+      await dialog.getByRole('combobox', { name: 'Format', exact: true }).selectOption('html');
       await dialog
         .getByLabel('Article', { exact: true })
         .fill(

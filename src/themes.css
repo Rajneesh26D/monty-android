@@ -226,6 +226,7 @@ button.selected,
   color: var(--text);
 }
 .cbt-section {
+  background: var(--accent-solid);
   color: var(--on-accent);
 }
 .cbt-section small {
