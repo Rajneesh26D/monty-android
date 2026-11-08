@@ -1,3 +1,5 @@
+import { setSystemAppearance } from '../services/systemBars';
+import { useAppearance } from '../services/appearance';
 import { useEffect, useRef, useState, type PointerEvent } from 'react';
 import {
   ArrowLeft,
@@ -69,6 +71,7 @@ export function ArticleReading({
   onBack: () => void;
 }) {
   const library = state.reading ?? emptyReading();
+  const globalAppearance = useAppearance();
   const [theme, setTheme] = useState<ReaderTheme>(() => {
     const value = preference('monty-reader-theme', 'midnight');
     return readerThemes.includes(value as ReaderTheme) ? (value as ReaderTheme) : 'midnight';
@@ -117,7 +120,20 @@ export function ArticleReading({
   };
   useEffect(() => {
     remember('monty-reader-theme', theme);
-  }, [theme]);
+    const backgrounds = {
+      midnight: '#000000',
+      paper: '#faf6ed',
+      slate: '#101c2d',
+      gold: '#111110',
+      editorial: '#ffffff',
+    };
+    setSystemAppearance(backgrounds[theme], theme === 'paper' || theme === 'editorial');
+    return () =>
+      setSystemAppearance(
+        globalAppearance.mode === 'dark' ? '#000000' : '#eef0f7',
+        globalAppearance.mode === 'light',
+      );
+  }, [theme, globalAppearance.mode]);
   useEffect(() => {
     remember('monty-reader-font', String(fontSize));
   }, [fontSize]);

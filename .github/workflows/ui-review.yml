@@ -1,0 +1,31 @@
+name: UI contrast and screen review
+on:
+  push:
+    branches: ['fix/reading-contrast']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  ui-review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run check
+      - run: npx vitest run --exclude tests/parser.test.ts --exclude tests/monty-parser.test.ts
+      - run: npm run build:android:web
+      - run: npx playwright install --with-deps chromium
+      - run: npx playwright test --config playwright.ui-review.config.ts
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Monty-UI-review
+          path: |
+            test-results/
+            playwright-report/
+          retention-days: 7

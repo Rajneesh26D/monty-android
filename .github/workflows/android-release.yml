@@ -38,6 +38,18 @@ jobs:
       - name: Core and updater tests (personal PDF fixtures are not published)
         run: npx vitest run --exclude tests/parser.test.ts --exclude tests/monty-parser.test.ts
       - run: npm run android:sync
+      - name: Rendered browser contrast and screen checks
+        run: |
+          npx playwright install --with-deps chromium
+          npx playwright test --config playwright.ui-review.config.ts
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Monty-release-UI-review
+          path: |
+            test-results/
+            playwright-report/
+          retention-days: 7
       - name: Native tests and Android lint
         working-directory: android
         run: ./gradlew testDebugUnitTest lintRelease --no-daemon

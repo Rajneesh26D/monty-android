@@ -1,3 +1,4 @@
+import { setSystemAppearance } from './systemBars';
 import { useSyncExternalStore } from 'react';
 
 export const themeColors = [
@@ -30,9 +31,7 @@ function apply() {
   document.documentElement.dataset.mode = current.mode;
   document.documentElement.dataset.theme = current.color;
   document.documentElement.style.colorScheme = current.mode;
-  document
-    .querySelector('meta[name="theme-color"]')
-    ?.setAttribute('content', current.mode === 'dark' ? '#000000' : '#eef0f7');
+  setSystemAppearance(current.mode === 'dark' ? '#000000' : '#eef0f7', current.mode === 'light');
 }
 export function initializeAppearance() {
   current = read();

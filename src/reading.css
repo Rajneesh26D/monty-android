@@ -1,3 +1,20 @@
+/* Bind every global colour role locally so global themes cannot leak into the reader. */
+.reading-app,
+.reading-app dialog {
+  --text: var(--reader-text);
+  --muted: var(--reader-muted);
+  --paper: var(--reader-bg);
+  --surface: var(--reader-surface);
+  --surface-soft: var(--reader-highlight);
+  --line: var(--reader-border);
+  --accent: var(--reader-accent);
+  --accent-solid: var(--reader-accent);
+  --accent-soft: var(--reader-highlight);
+  --on-accent: var(--reader-accent-text);
+}
+.reading-app :is(h1, h2, h3, h4, h5, h6) {
+  color: var(--reader-text);
+}
 .reading-app {
   --reader-bg: #000;
   --reader-surface: #11151b;
