@@ -20,7 +20,7 @@ public class SystemBarsPlugin extends Plugin {
             Window window = getActivity().getWindow();
             int colour = Color.parseColor(background);
             window.setStatusBarColor(colour);
-            window.setNavigationBarColor(colour);
+            window.setNavigationBarColor(light && Build.VERSION.SDK_INT < Build.VERSION_CODES.O ? Color.BLACK : colour);
             WindowInsetsControllerCompat controller = new WindowInsetsControllerCompat(window, window.getDecorView());
             controller.setAppearanceLightStatusBars(light);
             controller.setAppearanceLightNavigationBars(light);

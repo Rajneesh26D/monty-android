@@ -1,13 +1,16 @@
 import { defineConfig } from '@playwright/test';
 export default defineConfig({
   testDir: './tests/ui-review',
-  timeout: 90000,
-  expect: { timeout: 10000 },
-  workers: 2,
+  timeout: 60000,
+  expect: { timeout: 5000 },
+  fullyParallel: true,
+  workers: 4,
   retries: 0,
   reporter: [['list'], ['html', { open: 'never' }]],
   use: {
     baseURL: 'http://127.0.0.1:4173',
+    actionTimeout: 10000,
+    navigationTimeout: 20000,
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
   },

@@ -3,6 +3,9 @@ on:
   push:
     branches: ['fix/reading-contrast']
   workflow_dispatch:
+concurrency:
+  group: monty-ui-review-${{ github.ref }}
+  cancel-in-progress: true
 permissions:
   contents: read
 jobs:

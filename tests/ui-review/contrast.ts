@@ -40,17 +40,7 @@ export async function review(page: Page, info: TestInfo, name: string) {
       ratio: number;
       required: number;
     }[] = [];
-    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
-    while (walker.nextNode()) {
-      const node = walker.currentNode,
-        el = node.parentElement,
-        text = node.textContent?.trim();
-      if (
-        !el ||
-        !text ||
-        el.closest('script,style,option,[aria-hidden=true],.sr-only,button:disabled,input:disabled')
-      )
-        continue;
+    const inspect = (el: Element, text: string, override?: string) => {
       const rect = el.getBoundingClientRect(),
         style = getComputedStyle(el);
       if (
@@ -58,19 +48,15 @@ export async function review(page: Page, info: TestInfo, name: string) {
         rect.height < 2 ||
         style.visibility !== 'visible' ||
         style.display === 'none' ||
-        el.closest('dialog:not([open])')
+        el.closest('dialog:not([open]),[aria-hidden=true],.sr-only,button:disabled,input:disabled')
       )
-        continue;
-      // Hidden screens and clipped accessibility labels have no rendered text boxes.
-      const range = document.createRange();
-      range.selectNodeContents(node);
-      if (!range.getClientRects().length) continue;
+        return;
       let opacity = 1;
       for (let a: Element | null = el; a; a = a.parentElement)
         opacity *= Number(getComputedStyle(a).opacity);
-      if (opacity === 0) continue;
+      if (opacity === 0) return;
       const background = bg(el),
-        foreground = rgba(style.color);
+        foreground = rgba(override || style.color);
       foreground[3] *= opacity;
       const ratio = contrast(blend(foreground, background), background),
         size = parseFloat(style.fontSize),
@@ -80,12 +66,31 @@ export async function review(page: Page, info: TestInfo, name: string) {
         out.push({
           text: text.slice(0, 90),
           element: el.tagName.toLowerCase() + '.' + el.className,
-          color: style.color,
+          color: override || style.color,
           background: background.slice(0, 3).map(Math.round).join(','),
           ratio: Math.round(ratio * 100) / 100,
           required,
         });
+    };
+    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+    while (walker.nextNode()) {
+      const node = walker.currentNode,
+        el = node.parentElement,
+        text = node.textContent?.trim();
+      if (!el || !text || el.closest('script,style,option')) continue;
+      const range = document.createRange();
+      range.selectNodeContents(node);
+      if (range.getClientRects().length) inspect(el, text);
     }
+    document
+      .querySelectorAll<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>(
+        'input:not([type=checkbox]):not([type=radio]):not([type=file]),textarea,select',
+      )
+      .forEach((el) => {
+        inspect(el, el.value || 'Input text');
+        if ('placeholder' in el && el.placeholder && !el.value)
+          inspect(el, el.placeholder, getComputedStyle(el, '::placeholder').color);
+      });
     return out;
   });
   await page.screenshot({ path: info.outputPath(name + '.png'), fullPage: true });
