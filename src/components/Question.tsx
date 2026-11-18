@@ -35,8 +35,8 @@ export function Choices({
                   disabled={disabled}
                   aria-pressed={selected === kind}
                   onClick={() => onChoose(option.id, kind)}
-                  className={selected === kind ? 'selected' : ''}
                 >
+                  <Check className="choice-check" size={14} strokeWidth={3} aria-hidden="true" />
                   {kind === 'ant' ? 'Antonym' : 'Synonym'}
                 </button>
               ))}

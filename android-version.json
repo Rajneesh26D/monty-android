@@ -1,5 +1,5 @@
 {
-  "versionCode": 20118,
-  "versionName": "2.1.18",
-  "notes": "Fix numbered vocabulary PDFs and improve text and scan extraction with Gemini-first AI and provider fallback. Show saved English quizzes, choose question ranges across multiple PDFs, and take tests without a timer. Choose complete light and dark presets in Appearance, with clearer question and answer surfaces."
+  "versionCode": 20119,
+  "versionName": "2.1.19",
+  "notes": "Make selected Synonym and Antonym choices unmistakable with a blue fill and checkmark in every theme."
 }

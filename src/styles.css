@@ -833,6 +833,10 @@ textarea {
   gap: 5px;
 }
 .classify button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
   flex: 1;
   padding: 5px;
   border: 1px solid var(--line);
@@ -842,11 +846,18 @@ textarea {
   min-height: 39px;
   color: var(--muted);
 }
-.classify button.selected {
-  border-color: var(--green);
-  background: var(--surface-soft);
-  color: var(--green);
+.classify button[aria-pressed='true'] {
+  border-color: var(--choice-selected);
+  background: var(--choice-selected);
+  color: var(--on-choice-selected);
   font-weight: 700;
+}
+.classify .choice-check {
+  flex: none;
+  visibility: hidden;
+}
+.classify button[aria-pressed='true'] .choice-check {
+  visibility: visible;
 }
 .classify button:disabled {
   opacity: 1;

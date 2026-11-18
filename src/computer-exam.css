@@ -563,11 +563,6 @@
 .cbt-exam .classify button {
   border-radius: 3px;
 }
-.cbt-exam .classify button.selected {
-  color: var(--text);
-  border-color: var(--line);
-  background: var(--surface-soft);
-}
 .cbt-dialog {
   width: min(560px, calc(100vw - 32px));
   max-width: calc(100vw - 32px);

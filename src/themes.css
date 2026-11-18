@@ -17,6 +17,8 @@
   --accent-hover: #d4c4ff;
   --accent-soft: #34294f;
   --on-accent: #21133e;
+  --choice-selected: #a8c7ff;
+  --on-choice-selected: #12264a;
   --green: var(--accent);
   --white: var(--surface);
   --gold: var(--warning);
@@ -55,6 +57,8 @@
   --accent-hover: #5027b8;
   --accent-soft: #ece4ff;
   --on-accent: #ffffff;
+  --choice-selected: #2456ba;
+  --on-choice-selected: #ffffff;
   --success: #14633b;
   --success-soft: #def3e7;
   --success-solid: #247749;

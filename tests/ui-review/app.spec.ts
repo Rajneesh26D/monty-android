@@ -297,57 +297,79 @@ for (const appearance of appearances)
     await review(page, info, 'answer-analysis');
   });
 
-test('English quizzes list new tests and run a combined range with no countdown', async ({
-  page,
-}, info) => {
-  await prepare(page, { mode: 'light', color: 'violet' }, 'paper', true, true);
-  await page.getByRole('button', { name: 'English', exact: false }).first().click();
-  await page.getByRole('button', { name: 'Vocab', exact: true }).first().click();
-  await page.getByRole('button', { name: /^Anto \/ Syno/ }).click();
-  await page.getByRole('button', { name: 'Quiz', exact: true }).click();
-  await page.getByRole('checkbox', { name: /Vocabulary sheet 1/ }).check();
-  await page.getByRole('checkbox', { name: /Vocabulary sheet 3/ }).check();
-  await expect(page.getByText(/60 questions available/)).toBeVisible();
-  await page.getByLabel('Choose questions').fill('30 to 31');
-  await page.getByRole('button', { name: 'Create test', exact: true }).click();
-  const dialog = page.getByRole('dialog');
-  await dialog.getByRole('button', { name: 'No timer' }).click();
-  await dialog.getByRole('button', { name: 'Create test', exact: true }).click();
-  const saved = page.getByRole('region', { name: 'Saved tests' });
-  await expect(saved.getByText('2 questions · Untimed', { exact: false })).toBeVisible();
-  await saved.getByRole('button', { name: 'Start test', exact: true }).click();
-  await expect(dialog.getByRole('button', { name: 'No timer' })).toHaveAttribute(
-    'aria-pressed',
-    'true',
-  );
-  await dialog.getByRole('button', { name: 'Start test', exact: true }).click();
-  await expect(page.getByRole('region', { name: 'Exam question' })).toBeVisible();
-  await expect(page.getByRole('timer')).toHaveCount(0);
-  await expect(page.getByText('Term 1.30', { exact: true })).toBeVisible();
-  const choice = page.getByRole('group', { name: 'Classify Similar' });
-  await choice.getByRole('button', { name: 'Synonym', exact: true }).click();
-  await page.getByRole('button', { name: 'Clear Response', exact: true }).click();
-  await expect(choice.getByRole('button', { name: 'Synonym', exact: true })).toHaveAttribute(
-    'aria-pressed',
-    'false',
-  );
-  await choice.getByRole('button', { name: 'Synonym', exact: true }).click();
-  await page.getByRole('button', { name: 'Mark for Review & Next', exact: true }).click();
-  await expect(page.getByText('Term 3.1', { exact: true })).toBeVisible();
-  await review(page, info, 'untimed-vocabulary-exam');
-  await page.getByRole('button', { name: 'Submit test', exact: true }).first().click();
-  await page.getByRole('button', { name: 'Confirm submission', exact: true }).click();
-  await expect(page.getByText('Test completed', { exact: true })).toBeVisible();
-  await review(page, info, 'vocabulary-result');
-  await page.getByRole('button', { name: 'Analyse answers' }).click();
-  await review(page, info, 'vocabulary-analysis');
-  await page.locator('.analysis').getByRole('button', { name: 'Results', exact: true }).click();
-  await page.getByRole('button', { name: 'Reattempt test' }).click();
-  await dialog.getByRole('checkbox', { name: 'Shuffle answer options' }).check();
-  await dialog.getByRole('button', { name: '5 min', exact: true }).click();
-  await dialog.getByRole('button', { name: 'Start reattempt' }).click();
-  await expect(page.getByRole('timer')).toBeVisible();
-});
+for (const appearance of [
+  { mode: 'dark', color: 'black' },
+  { mode: 'dark', color: 'amoled' },
+  { mode: 'light', color: 'red' },
+]) {
+  test(`English quizzes show selected classifications in ${appearance.mode} ${appearance.color}`, async ({
+    page,
+  }, info) => {
+    await prepare(page, appearance, 'paper', true, true);
+    await page.getByRole('button', { name: 'English', exact: false }).first().click();
+    await page.getByRole('button', { name: 'Vocab', exact: true }).first().click();
+    await page.getByRole('button', { name: /^Anto \/ Syno/ }).click();
+    await page.getByRole('button', { name: 'Quiz', exact: true }).click();
+    await page.getByRole('checkbox', { name: /Vocabulary sheet 1/ }).check();
+    await page.getByRole('checkbox', { name: /Vocabulary sheet 3/ }).check();
+    await expect(page.getByText(/60 questions available/)).toBeVisible();
+    await page.getByLabel('Choose questions').fill('30 to 31');
+    await page.getByRole('button', { name: 'Create test', exact: true }).click();
+    const dialog = page.getByRole('dialog');
+    await dialog.getByRole('button', { name: 'No timer' }).click();
+    await dialog.getByRole('button', { name: 'Create test', exact: true }).click();
+    const saved = page.getByRole('region', { name: 'Saved tests' });
+    await expect(saved.getByText('2 questions · Untimed', { exact: false })).toBeVisible();
+    await saved.getByRole('button', { name: 'Start test', exact: true }).click();
+    await expect(dialog.getByRole('button', { name: 'No timer' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    await dialog.getByRole('button', { name: 'Start test', exact: true }).click();
+    await expect(page.getByRole('region', { name: 'Exam question' })).toBeVisible();
+    await expect(page.getByRole('timer')).toHaveCount(0);
+    await expect(page.getByText('Term 1.30', { exact: true })).toBeVisible();
+    const choice = page.getByRole('group', { name: 'Classify Similar' });
+    const synonym = choice.getByRole('button', { name: 'Synonym', exact: true });
+    const antonym = choice.getByRole('button', { name: 'Antonym', exact: true });
+    const selectedFill = appearance.mode === 'dark' ? 'rgb(168, 199, 255)' : 'rgb(36, 86, 186)';
+    const unselectedFill = await synonym.evaluate(
+      (button) => getComputedStyle(button).backgroundColor,
+    );
+    expect(unselectedFill).not.toBe(selectedFill);
+    await expect(synonym.locator('.choice-check')).toBeHidden();
+    await synonym.click();
+    await expect(synonym).toHaveCSS('background-color', selectedFill);
+    await expect(synonym.locator('.choice-check')).toBeVisible();
+    await expect(antonym).toHaveCSS('background-color', unselectedFill);
+    await expect(antonym.locator('.choice-check')).toBeHidden();
+    await review(page, info, 'selected-classification');
+    await antonym.click();
+    await expect(antonym).toHaveCSS('background-color', selectedFill);
+    await expect(antonym.locator('.choice-check')).toBeVisible();
+    await expect(synonym).toHaveCSS('background-color', unselectedFill);
+    await expect(synonym.locator('.choice-check')).toBeHidden();
+    await page.getByRole('button', { name: 'Clear Response', exact: true }).click();
+    await expect(antonym).toHaveAttribute('aria-pressed', 'false');
+    await expect(antonym.locator('.choice-check')).toBeHidden();
+    await synonym.click();
+    await page.getByRole('button', { name: 'Mark for Review & Next', exact: true }).click();
+    await expect(page.getByText('Term 3.1', { exact: true })).toBeVisible();
+    await review(page, info, 'untimed-vocabulary-exam');
+    await page.getByRole('button', { name: 'Submit test', exact: true }).first().click();
+    await page.getByRole('button', { name: 'Confirm submission', exact: true }).click();
+    await expect(page.getByText('Test completed', { exact: true })).toBeVisible();
+    await review(page, info, 'vocabulary-result');
+    await page.getByRole('button', { name: 'Analyse answers' }).click();
+    await review(page, info, 'vocabulary-analysis');
+    await page.locator('.analysis').getByRole('button', { name: 'Results', exact: true }).click();
+    await page.getByRole('button', { name: 'Reattempt test' }).click();
+    await dialog.getByRole('checkbox', { name: 'Shuffle answer options' }).check();
+    await dialog.getByRole('button', { name: '5 min', exact: true }).click();
+    await dialog.getByRole('button', { name: 'Start reattempt' }).click();
+    await expect(page.getByRole('timer')).toBeVisible();
+  });
+}
 
 test('red and AMOLED presets stay selected across navigation and reload', async ({
   page,
