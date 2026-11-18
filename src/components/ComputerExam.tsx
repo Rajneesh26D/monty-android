@@ -256,10 +256,12 @@ export function ComputerExam({
           <small>Section</small>
           <strong>{section}</strong>
         </div>
-        <div className={'cbt-clock ' + (timer.remaining < 60000 ? 'urgent' : '')}>
-          <span>Time left</span>
-          <strong role="timer">{time(timer.remaining)}</strong>
-        </div>
+        {!timer.untimed && (
+          <div className={'cbt-clock ' + (timer.remaining < 60000 ? 'urgent' : '')}>
+            <span>Time left</span>
+            <strong role="timer">{time(timer.remaining)}</strong>
+          </div>
+        )}
         <button
           className="cbt-button cbt-palette-toggle"
           aria-haspopup="dialog"

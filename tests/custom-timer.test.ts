@@ -101,6 +101,19 @@ it('keeps legacy saved attempts compatible and calculates their elapsed time', (
   expect(finishExam(test, bank).latest!.elapsedMs).toBe(20000);
 });
 
-it.each([0, -1, 1.5, NaN, Infinity, 525601])('rejects invalid timer duration %s', (value) => {
+it.each([-1, 1.5, NaN, Infinity, 525601])('rejects invalid timer duration %s', (value) => {
   expect(() => freshClock(value)).toThrow('whole number');
+});
+
+it('preserves untimed attempts across saves and records elapsed time without a countdown', () => {
+  const state = upgradeState(emptyState());
+  const test = { ...vocabulary(), durationMinutes: 0 };
+  const started = startAttempt(test, test.durationMinutes);
+  const questionId = started.questions[0].id;
+  started.draft!.clock = advanceClock(started.draft!.clock!, questionId, 3600000);
+  state.tests = [started];
+  const saved = stateSchema.parse(JSON.parse(JSON.stringify(state))).tests[0];
+  expect(saved.durationMinutes).toBe(0);
+  expect(saved.draft!.clock).toMatchObject({ untimed: true, remainingMs: 0 });
+  expect(finishAttempt(saved, true).latest!.elapsedMs).toBe(3600000);
 });

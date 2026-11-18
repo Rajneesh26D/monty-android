@@ -1,5 +1,5 @@
 {
-  "versionCode": 20117,
-  "versionName": "2.1.17",
-  "notes": "Fix invisible headings and text in all five reading themes. Isolate reader colours from the global appearance; match Android status and navigation icons to light and dark surfaces. Fix quiz section label contrast across app themes. Add rendered phone and desktop contrast checks before every Android release."
+  "versionCode": 20118,
+  "versionName": "2.1.18",
+  "notes": "Fix numbered vocabulary PDFs and improve text and scan extraction with Gemini-first AI and provider fallback. Show saved English quizzes, choose question ranges across multiple PDFs, and take tests without a timer. Choose complete light and dark presets in Appearance, with clearer question and answer surfaces."
 }

@@ -82,7 +82,7 @@ export async function recoverMaths(
   };
   if (bank.questions.length && options.onCheckpoint) await options.onCheckpoint(snapshot());
   const pageAt = async (n: number) =>
-    (await readJob<PageData>(`page-${sourceId}-${n}`)) ?? (await pdf.page(n));
+    (await readJob<PageData>(`page-v2-${sourceId}-${n}`)) ?? (await pdf.page(n));
   for (let n = 1; n <= pdf.count; n++) {
     if (signal?.aborted) throw new Error('Import paused. Completed questions are saved.');
     const page = await pageAt(n);
@@ -106,7 +106,11 @@ export async function recoverMaths(
         return {
           number: p.number,
           text: readingText({ ...p, items, text: linesOf(items).join('\n') }).slice(0, 40000),
-          ...(p.text.trim().length < 50 ? { image: await pdf.image(p.number) } : {}),
+          ...(p.text.trim().length < 50 ||
+          p.hasVisualContent ||
+          /[\uFFFD\uE000-\uF8FF]/.test(p.text)
+            ? { image: await pdf.image(p.number) }
+            : {}),
         };
       }),
     );
@@ -213,7 +217,7 @@ export async function recoverMaths(
     warnings.push(
       `Questions waiting for recovery: ${missing.join(', ')}. Successfully extracted questions are available in this quiz.`,
     );
-  if (uncertain)
+  if (uncertain || (failures >= 2 && !targets.size))
     warnings.push('Some source questions are unresolved; completed recovery chunks are saved.');
   if (!collected.size)
     warnings.push('No reliable questions extracted yet. The original PDF is saved.');

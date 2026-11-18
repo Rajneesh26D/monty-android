@@ -36,6 +36,7 @@ import { ExamScreen, ExamAnalysis } from './ExamScreen';
 import { SavedQuestions, questionRef } from './SavedQuestions';
 import { BankEditor } from './BankEditor';
 import { QuestionTracker } from './QuestionTracker';
+import { MATH_LAYOUT_VERSION } from '../pdf/content';
 import { resumePractice } from '../core/questionProgress';
 type Tab = 'notes' | 'practice' | 'quiz' | 'results' | 'bookmarks';
 export function StudyFolder({
@@ -266,11 +267,25 @@ export function StudyFolder({
     let questions = readyQuizSource.questions;
     const study = readyQuizSource.study;
     const numbers = parseQuestionSelection(questionSelection, questions.length);
-    questions = numbers.map((n) => questions[n - 1]);
+    const ids = new Set<string>();
+    questions = numbers.map((n) => {
+      const question = questions[n - 1];
+      const id = ids.has(question.id) ? uid() : question.id;
+      ids.add(id);
+      return { ...question, id };
+    });
     const setup = await chooseSetup('Selected questions', false, 1, customization, true);
     if (setup === null) return;
     const id = 'bank-' + uid(),
-      combined: Bank = { version: 1, id, kind: 'general', questions, study, warnings: [] };
+      combined: Bank = {
+        version: 1,
+        id,
+        kind: math ? 'maths' : 'general',
+        questions,
+        study,
+        warnings: [],
+        ...(math ? { mathLayoutVersion: MATH_LAYOUT_VERSION } : {}),
+      };
     await saveBank(combined);
     const generated = createExamSet(
       {
@@ -299,12 +314,12 @@ export function StudyFolder({
         ...s.monty!,
         banks: {
           ...s.monty!.banks,
-          [id]: { id, kind: 'general', count: questions.length, studyCount: study.length },
+          [id]: { id, kind: combined.kind, count: questions.length, studyCount: study.length },
         },
         tests: {
           ...s.monty!.tests,
           ...Object.fromEntries(
-            generated.map((t, i) => [
+            generated.map((t) => [
               t.id,
               { ...t, selectionNumbers: numbers, durationMinutes: setup.minutes },
             ]),
@@ -313,6 +328,8 @@ export function StudyFolder({
       },
     }));
     notify('Test created. Start it when you are ready.');
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+    document.getElementById(generated[0].id)?.scrollIntoView({ block: 'nearest' });
     setBank(combined);
     setResultId(null);
   }
@@ -326,7 +343,7 @@ export function StudyFolder({
     await removeAttachment(file.id);
   }
   const testCard = (t: Exam) => (
-    <article className="test-card" key={t.id}>
+    <article className="test-card" id={t.id} key={t.id}>
       <div className="card-heading">
         <div>
           <h3>{t.name}</h3>
@@ -336,9 +353,14 @@ export function StudyFolder({
             </p>
           )}
           <p className="muted">
-            {t.questionIds.length} questions · {t.durationMinutes ?? 15} min
+            {t.questionIds.length} questions ·{' '}
+            {t.durationMinutes === 0 ? 'Untimed' : `${t.durationMinutes ?? 15} min`}
           </p>
-          {t.draft && <small>Paused · {time(t.draft.clock.remainingMs)} remaining</small>}
+          {t.draft && (
+            <small>
+              Paused{t.draft.clock.untimed ? '' : ` · ${time(t.draft.clock.remainingMs)} remaining`}
+            </small>
+          )}
         </div>
         <button
           className="icon-button delete"
@@ -562,7 +584,7 @@ export function StudyFolder({
                   </button>
                 </div>
               )}
-              {studyMode && bank.study.length > 0 ? (
+              {(studyMode || !bank.questions.length) && bank.study.length > 0 ? (
                 <>
                   <StudyNavigator
                     key={bank.id}
@@ -765,15 +787,21 @@ export function StudyFolder({
                   </p>
                 ) : (
                   <div className="pdf-checklist">
+                    <p className="muted">Select one or more PDFs</p>
                     {files
                       .filter((f) => f.bankId)
                       .map((f) => (
                         <label className="pdf-check" key={f.id}>
                           <input
-                            type="radio"
-                            name="quiz-sheet"
+                            type="checkbox"
                             checked={selection.includes(f.id)}
-                            onChange={(e) => setSelection(e.target.checked ? [f.id] : [])}
+                            onChange={() =>
+                              setSelection((ids) =>
+                                ids.includes(f.id)
+                                  ? ids.filter((id) => id !== f.id)
+                                  : [...ids, f.id],
+                              )
+                            }
                           />
                           <span>
                             {f.name}
@@ -783,6 +811,7 @@ export function StudyFolder({
                       ))}
                   </div>
                 )}
+                {readyQuizSource?.error && <p role="alert">{readyQuizSource.error}</p>}
                 <QuestionSelection
                   total={availableQuestions}
                   value={questionSelection}

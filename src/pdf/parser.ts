@@ -1,6 +1,6 @@
 import { type Entry } from '../../shared/types';
 import { blankEntry, sourceExplanations } from '../core/vocabulary';
-export const PARSER_VERSION = 2;
+export const PARSER_VERSION = 3;
 export interface TextItem {
   text: string;
   x: number;
@@ -67,8 +67,8 @@ export function splitMeaning(text: string): { meaningEn: string; meaningHi: stri
   return { meaningEn, meaningHi: hindi.join('; ') };
 }
 const label =
-  /^(mnemonics?|memory\s*tricks?|root\s*words?|synonyms?|antonyms?|e\s*\.\s*g\s*\.?|examples?)\s*(?:[:\-–—]\s*)*(.*)$/i;
-const head = /^([A-Za-z][A-Za-z'’` -]{0,50}?)\s*:\s*[-–—]?\s*(.*)$/;
+  /^(mnemonics?|memory\s*tricks?|root\s*words?|synonyms?|antonyms?|e\s*\.?\s*g\s*\.?|examples?)(?=\s|[:\-–—]|$)\s*(?:[:\-–—]\s*)*(.*)$/i;
+const head = /^(?:\d+[.)]\s*)?([A-Za-z][A-Za-z'’` -]{0,50}?)\s*:\s*[-–—]?\s*(.*)$/;
 const relations = (s: string) =>
   s
     .split(/[,;•]/)

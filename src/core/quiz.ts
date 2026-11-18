@@ -1,4 +1,4 @@
-import { freshClock, DEFAULT_DURATION_MS } from '../../shared/monty';
+import { freshClock, clockElapsed } from '../../shared/monty';
 import { type Answers, type Entry, type QuizTest, type Result, uid } from '../../shared/types';
 import { canQuiz, normalize } from './vocabulary';
 export { shuffle } from './quizOrder';
@@ -159,9 +159,7 @@ export function grade(test: QuizTest, answers: Answers, allowPartial = false): R
     ).length,
     unanswered: test.questions.filter((q) => !Object.keys(answers[q.id] ?? {}).length).length,
     spent: test.draft?.clock?.spent,
-    elapsedMs: test.draft?.clock
-      ? (test.draft.clock.durationMs ?? DEFAULT_DURATION_MS) - test.draft.clock.remainingMs
-      : undefined,
+    elapsedMs: test.draft?.clock ? clockElapsed(test.draft.clock) : undefined,
     total: test.questions.length,
     answers: structuredClone(answers),
   };

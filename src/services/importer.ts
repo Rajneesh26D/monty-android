@@ -99,7 +99,9 @@ export async function processDocument(
         page = pages.find((p) => p.number === number)!;
       progress(`Finding vocabulary on page ${number}…`, 40 + (i / pending.length) * 20);
       const image =
-        page.text.trim().length < 30 || /[\uFFFD\uE000-\uF8FF]/.test(page.text)
+        page.text.trim().length < 30 ||
+        page.hasVisualContent ||
+        /[\uFFFD\uE000-\uF8FF]/.test(page.text)
           ? await pdf.image(number)
           : undefined;
       const result = await processBatch(

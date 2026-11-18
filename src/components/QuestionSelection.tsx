@@ -52,7 +52,7 @@ export function QuestionSelection({
       </label>
       <p className="muted">
         {total} questions available. Use commas, ranges, or “all”. For the first 25 questions, enter
-        1 to 25. Numbering follows the practice palette.
+        1 to 25. For multiple PDFs, numbering continues across selected PDFs in the order shown.
       </p>
       <div className="actions">
         <button className="text-button" onClick={() => onChange('all')}>

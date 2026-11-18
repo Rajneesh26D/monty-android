@@ -1,3 +1,7 @@
+import { geminiJSON, logProviderFailure } from './gemini';
+import { inferxJSON } from './inferx';
+import { APIError, parseModelJSON } from './provider-response';
+export { APIError, parseModelJSON } from './provider-response';
 import { aiResponseSchema, discoverySchema, type ProcessRequest } from '../shared/validation';
 import { SYSTEM_PROMPT, DISCOVERY_PROMPT, ENRICH_PROMPT } from './prompt';
 export const PRIORITY = [
@@ -12,16 +16,6 @@ export const PRIORITY = [
   'recursive/flint-v1.0:free',
   'xingchen-agi/xing4.0-29b-a4b:free',
 ];
-export class APIError extends Error {
-  diagnostics?: { provider: string; outcome: string; status?: number }[];
-  constructor(
-    public status: number,
-    message: string,
-    public retryAfter?: number,
-  ) {
-    super(message);
-  }
-}
 interface Model {
   id: string;
   pricing: Record<string, string>;
@@ -49,12 +43,6 @@ export async function freeModels(fetcher: typeof fetch = fetch): Promise<Model[]
   );
   cached = { expires: Date.now() + 3600000, models };
   return models;
-}
-export function parseModelJSON(text: string): unknown {
-  const start = text.indexOf('{'),
-    end = text.lastIndexOf('}');
-  if (start < 0 || end < start) throw new Error('No JSON object returned');
-  return JSON.parse(text.slice(start, end + 1));
 }
 export function validateOutput(value: unknown, input: ProcessRequest) {
   const allowed = new Set([
@@ -123,9 +111,59 @@ export async function runAI(
   key: string,
   beforeCall: () => Promise<void>,
   fetcher: typeof fetch = fetch,
+  geminiKey?: string,
+  inferxKey?: string,
 ) {
-  const models = await freeModels(fetcher),
-    vision = input.pages.some((p) => p.image);
+  const deadline = Date.now() + 150000;
+  const vision = input.pages.some((p) => p.image);
+  const task = input.mode === 'discover' ? DISCOVERY_PROMPT : ENRICH_PROMPT;
+  const entries = input.entries.map((e) => ({
+    candidateId: e.candidateId,
+    word: e.word,
+    context: {
+      meaningEn: e.meaningEn,
+      meaningHi: e.meaningHi,
+      synonyms: e.synonyms.map((r) => r.term),
+      antonyms: e.antonyms.map((r) => r.term),
+    },
+    missing: (
+      ['meaningEn', 'meaningHi', 'mnemonic', 'example', 'synonyms', 'antonyms'] as const
+    ).filter((k) => !e[k].length),
+  }));
+  const pages = input.pages.map(({ number, text }) => ({ number, text }));
+  if (geminiKey) {
+    await beforeCall();
+    try {
+      const raw = await geminiJSON(
+        SYSTEM_PROMPT + '\n' + task,
+        { entries },
+        geminiKey,
+        fetcher,
+        65000,
+        input.pages,
+      );
+      return { ...validateOutput(raw, input), model: 'gemini-flash-latest' };
+    } catch (error) {
+      logProviderFailure('Gemini Flash', error);
+    }
+  }
+  if (inferxKey && !vision) {
+    await beforeCall();
+    try {
+      const raw = await inferxJSON(
+        SYSTEM_PROMPT + '\n' + task,
+        { entries, pages },
+        inferxKey,
+        fetcher,
+        35000,
+      );
+      return { ...validateOutput(raw, input), model: 'InferX DeepSeek' };
+    } catch (error) {
+      logProviderFailure('InferX', error);
+    }
+  }
+  if (!key) throw new APIError(503, 'AI could not finish this batch. Your import is saved.');
+  const models = await freeModels(fetcher);
   const ranked = [
     ...PRIORITY.map((id) => models.find((m) => m.id === id)).filter((m): m is Model => !!m),
     ...models.filter((m) => !PRIORITY.includes(m.id)),
@@ -138,34 +176,16 @@ export async function runAI(
       503,
       'No compatible free model is available. Import progress has been saved.',
     );
-  const content: any[] = [
-    {
-      type: 'text',
-      text:
-        (input.mode === 'discover' ? DISCOVERY_PROMPT : ENRICH_PROMPT) +
-        '\nDOCUMENT DATA:\n' +
-        JSON.stringify({
-          entries: input.entries.map((e) => ({
-            candidateId: e.candidateId,
-            word: e.word,
-            context: {
-              meaningEn: e.meaningEn,
-              meaningHi: e.meaningHi,
-              synonyms: e.synonyms.map((r) => r.term),
-              antonyms: e.antonyms.map((r) => r.term),
-            },
-            missing: (
-              ['meaningEn', 'meaningHi', 'mnemonic', 'example', 'synonyms', 'antonyms'] as const
-            ).filter((k) => !e[k].length),
-          })),
-          pages: input.pages.map(({ number, text }) => ({ number, text })),
-        }),
-    },
+  const content: unknown[] = [
+    { type: 'text', text: task + '\nDOCUMENT DATA:\n' + JSON.stringify({ entries, pages }) },
   ];
   for (const p of input.pages)
-    if (p.image) content.push({ type: 'image_url', image_url: { url: p.image } });
+    if (p.image)
+      content.push(
+        { type: 'text', text: `Image for page ${p.number}:` },
+        { type: 'image_url', image_url: { url: p.image } },
+      );
   const failures = { rate: 0, provider: 0, output: 0, timeout: 0 };
-  const deadline = Date.now() + 150000;
   for (const model of eligible.slice(0, 10)) {
     if (Date.now() > deadline) break;
     await beforeCall();
@@ -173,7 +193,7 @@ export async function runAI(
       const r = await fetcher('https://openrouter.ai/api/v1/chat/completions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
-        signal: AbortSignal.timeout(25000),
+        signal: AbortSignal.timeout(Math.max(1, Math.min(25000, deadline - Date.now()))),
         body: JSON.stringify({
           model: model.id,
           messages: [

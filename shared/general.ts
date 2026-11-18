@@ -1,6 +1,7 @@
 import { z } from 'zod';
 export const generalRequestSchema = z.object({
-  area: z.enum(['vocab', 'grammar', 'reading']),
+  area: z.enum(['vocab', 'grammar', 'reading', 'maths']),
+  task: z.literal('study').optional(),
   pages: z
     .array(
       z.object({

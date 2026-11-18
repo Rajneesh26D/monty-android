@@ -239,7 +239,7 @@ export default function App({
   async function generate() {
     const s = current(),
       docs = s.documents.filter((d) => selected.includes(d.id));
-    const ids = bookmarkSource ? s.bookmarks : [...new Set(docs.flatMap((d) => d.entryIds))];
+    const ids = bookmarkSource ? s.bookmarks : docs.flatMap((d) => d.entryIds);
     const entries = ids.map((id) => s.entries[id]).filter(Boolean);
     if (!bookmarkSource && !docs.length) throw new Error('Select at least one PDF.');
     const source = bookmarkSource ? 'bookmarks' : docs.length > 1 ? 'combined' : 'pdf';
@@ -266,6 +266,7 @@ export default function App({
     const generated = [{ ...test, selectionNumbers: numbers, durationMinutes: setup.minutes }];
     await commit((s) => ({ ...s, tests: [...generated, ...s.tests] }));
     setToast('Test created. Start it when you are ready.');
+    main.current?.scrollTo({ top: 0 });
     setResultId(null);
     setAnalysisId(null);
   }
@@ -352,9 +353,7 @@ export default function App({
     result = state.tests.find((t) => t.id === resultId);
   const fullQuiz = !!active?.draft;
   const selectedDocs = state.documents.filter((d) => selected.includes(d.id));
-  const available = (
-    bookmarkSource ? state.bookmarks : [...new Set(selectedDocs.flatMap((d) => d.entryIds))]
-  )
+  const available = (bookmarkSource ? state.bookmarks : selectedDocs.flatMap((d) => d.entryIds))
     .map((id) => state.entries[id])
     .filter(Boolean);
   let validSelection = false;
@@ -383,7 +382,8 @@ export default function App({
               </p>
             )}
             <p className="muted">
-              {test.questions.length} questions · {test.durationMinutes ?? 15} min ·{' '}
+              {test.questions.length} questions ·{' '}
+              {test.durationMinutes === 0 ? 'Untimed' : `${test.durationMinutes ?? 15} min`} ·{' '}
               {date(test.createdAt)}
             </p>
           </div>
@@ -883,6 +883,12 @@ export default function App({
                   {state.tests.filter((t) => t.draft).map(testCard)}
                 </section>
               )}
+              {state.tests.some((t) => !t.draft && !t.latest) && (
+                <section aria-label="Saved tests">
+                  <h2 className="section-title">Saved tests</h2>
+                  {state.tests.filter((t) => !t.draft && !t.latest).map(testCard)}
+                </section>
+              )}
               <section className="panel quiz-setup">
                 <h2>New test</h2>
                 <div className="segmented full">
@@ -921,14 +927,19 @@ export default function App({
                   <div className="pdf-checklist">
                     {state.documents.length ? (
                       <>
-                        <p className="muted">Choose a practice sheet</p>
+                        <p className="muted">Select one or more PDFs</p>
                         {state.documents.map((d) => (
                           <label className="pdf-check" key={d.id}>
                             <input
-                              type="radio"
-                              name="quiz-sheet"
+                              type="checkbox"
                               checked={selected.includes(d.id)}
-                              onChange={(e) => setSelected(e.target.checked ? [d.id] : [])}
+                              onChange={() =>
+                                setSelected((ids) =>
+                                  ids.includes(d.id)
+                                    ? ids.filter((id) => id !== d.id)
+                                    : [...ids, d.id],
+                                )
+                              }
                             />
                             <span>
                               {d.name}

@@ -1,5 +1,5 @@
 import { readingSchema } from './reading';
-import { workspaceSchema, clockSchema } from './monty';
+import { workspaceSchema, clockSchema, MAX_TIMER_MINUTES } from './monty';
 import { attemptOrderFields, quizCustomizationSchema } from './quiz-customization';
 import { z } from 'zod';
 import { relationSchema } from './validation';
@@ -40,7 +40,7 @@ const quiz = z.object({
   questions: z.array(question).min(1),
   customization: quizCustomizationSchema.optional(),
   selectionNumbers: z.array(z.number().int().positive()).optional(),
-  durationMinutes: z.number().int().min(1).max(525600).optional(),
+  durationMinutes: z.number().int().min(0).max(MAX_TIMER_MINUTES).optional(),
   latest: z
     .object({
       completedAt: z.number(),

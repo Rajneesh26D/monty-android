@@ -215,21 +215,22 @@ async function processPractice(
     const bankId = attachment.bankId ?? 'bank-' + id;
     const pages: PageData[] = [];
     const vocabulary: Entry[] = [];
+    let completeVocabulary = true;
     for (let n = 1; n <= pdf.count; n++) {
       if (signal?.aborted) throw new Error('Import paused. Completed pages are saved.');
-      let page = await readJob<PageData>(`page-${id}-${n}`);
+      let page = await readJob<PageData>(`page-v2-${id}-${n}`);
       if (!page || page.items.some((item) => item.text.trim() && !item.fontName)) {
         page = await pdf.page(n);
-        await saveJob(`page-${id}-${n}`, page);
+        await saveJob(`page-v2-${id}-${n}`, page);
       }
-      if (folder.profile !== 'idioms') sourceQuestions.add(page);
-      if (folder.area === 'maths') math.add(page);
-      else if (folder.profile === 'idioms') idioms.add(page);
-      else {
-        math.add(page);
+      pages.push(page);
+      sourceQuestions.add(page);
+      math.add(page);
+      if (folder.area !== 'maths') {
         idioms.add(page);
-        vocabulary.push(...parsePages([page], id).entries);
-        pages.push(page);
+        const parsed = parsePages([page], id);
+        vocabulary.push(...parsed.entries);
+        completeVocabulary &&= !parsed.unknownPages.length;
       }
       progress(`Reading page ${n} of ${pdf.count}`, Math.round((n / pdf.count) * 55));
       if (n % 3 === 0) await new Promise((r) => setTimeout(r, 0));
@@ -242,7 +243,9 @@ async function processPractice(
       bank = useGeneric
         ? { ...generic, kind: 'maths', mathLayoutVersion: MATH_LAYOUT_VERSION }
         : normal;
-      if (bank.warnings.length)
+      if (!bank.questions.length && !sourceQuestions.hasChoices() && !math.sourceAnswers().length)
+        bank = await generalBank(pages, folder.area, bankId, id, pdf, progress, signal);
+      else if (bank.warnings.length)
         bank = await recoverMaths(
           bank,
           useGeneric ? sourceQuestions.sourceAnswers() : math.sourceAnswers(),
@@ -259,13 +262,6 @@ async function processPractice(
             },
           },
         );
-    } else if (folder.profile === 'idioms') {
-      bank = idioms.finish(bankId);
-      if (!bank.study.length) {
-        for (let n = 1; n <= pdf.count; n++)
-          pages.push((await readJob<PageData>(`page-${id}-${n}`))!);
-        bank = await generalBank(pages, folder.area, bankId, id, pdf, progress, signal);
-      }
     } else {
       const normal = math.finish(bankId),
         generic = sourceQuestions.finish(bankId);
@@ -292,6 +288,7 @@ async function processPractice(
             },
           );
       } else if (
+        completeVocabulary &&
         vocabulary.length >= 2 &&
         vocabulary.every((e) => e.meaningEn && (e.meaningHi || e.synonyms.length))
       ) {
@@ -309,7 +306,13 @@ async function processPractice(
         bank = { ...new IdiomsParser(study).finish(bankId), kind: 'general' };
       } else if (
         phrases.study.length >= 2 &&
-        (folder.area === 'vocab' || pages.some((p) => /idioms?\s*lecture|proverbs?/i.test(p.text)))
+        (folder.profile === 'idioms' ||
+          pages.some((p) => /idioms?\s*lecture|proverbs?/i.test(p.text))) &&
+        pages.every(
+          (p) =>
+            !p.hasVisualContent &&
+            (p.text.trim().length <= 30 || phrases.study.some((item) => item.page === p.number)),
+        )
       )
         bank = phrases;
       else bank = await generalBank(pages, folder.area, bankId, id, pdf, progress, signal);
@@ -367,6 +370,8 @@ async function generalBank(
 ): Promise<Bank> {
   const useful = pages.filter((p) => p.text.trim().length > 30 || p.hasVisualContent);
   const outputs: GeneralOutput[] = [];
+  const warnings: string[] = [];
+  let consecutiveFailures = 0;
   let position = 0,
     chunk = 0;
   while (position < useful.length) {
@@ -380,30 +385,46 @@ async function generalBank(
       length += page.text.length;
       position++;
     }
-    const key = `general-${jobId}-${chunk++}`;
+    const key = `general-v2-${area}-${jobId}-${chunk++}`;
     let result = await readJob<GeneralOutput>(key);
     if (!result) {
       progress(
         `Extracting study content · pages ${group.map((p) => p.number).join(', ')}`,
         55 + Math.round((position / useful.length) * 40),
       );
-      result = await extractGeneral(
-        {
-          area: area === 'maths' ? 'vocab' : area,
-          pages: await Promise.all(
-            group.map(async (p) => ({
-              number: p.number,
-              text: readingText(p).slice(0, 30000),
-              ...(p.text.trim().length < 30 || /[\uFFFD\uE000-\uF8FF]/.test(p.text)
-                ? { image: await pdf.image(p.number) }
-                : {}),
-            })),
-          ),
-        },
-        signal,
-      );
-      await saveJob(key, result);
+      try {
+        result = await extractGeneral(
+          {
+            area,
+            task: 'study',
+            pages: await Promise.all(
+              group.map(async (p) => ({
+                number: p.number,
+                text: readingText(p).slice(0, 30000),
+                ...(area === 'maths' || p.hasVisualContent || /[\uFFFD\uE000-\uF8FF]/.test(p.text)
+                  ? { image: await pdf.image(p.number) }
+                  : {}),
+              })),
+            ),
+          },
+          signal,
+        );
+        await saveJob(key, result);
+      } catch (error) {
+        if (signal?.aborted) throw error;
+        warnings.push(
+          `Pages ${group.map((p) => p.number).join(', ')} still need extraction. ${error instanceof Error ? error.message : 'Retry this import.'}`,
+        );
+        if (++consecutiveFailures >= 2 && position < useful.length) {
+          warnings.push(
+            `Pages ${useful[position].number} onward are waiting for extraction. Resume this import to continue.`,
+          );
+          break;
+        }
+        continue;
+      }
     }
+    consecutiveFailures = 0;
     outputs.push(result);
   }
   const study: StudyItem[] = [],
@@ -445,13 +466,13 @@ async function generalBank(
   return {
     version: 1,
     id: bankId,
-    kind: 'general',
+    kind: area === 'maths' ? 'maths' : 'general',
+    ...(area === 'maths' ? { mathLayoutVersion: MATH_LAYOUT_VERSION } : {}),
     study,
     questions,
-    warnings: !questions.length
-      ? [
-          'Study content is saved, but no reliable quiz questions were produced. Review or retry this import.',
-        ]
-      : [],
+    warnings:
+      questions.length || warnings.length
+        ? warnings
+        : ['No reliable quiz questions were produced. Review or retry this import.'],
   };
 }

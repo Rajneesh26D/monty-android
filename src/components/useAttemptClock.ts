@@ -99,7 +99,7 @@ export function useAttemptClock(
           void options.current.persist({ ...clock });
         }
       }
-      if (active.current && clock.remainingMs <= 0 && !expiring.current) {
+      if (active.current && !clock.untimed && clock.remainingMs <= 0 && !expiring.current) {
         expiring.current = true;
         active.current = false;
         clock.paused = true;
@@ -135,5 +135,14 @@ export function useAttemptClock(
       last.current = performance.now();
     }
   }, [questionId]);
-  return { remaining: display, paused, busy, pause, resume, flush, capture };
+  return {
+    remaining: display,
+    untimed: !!initial?.untimed,
+    paused,
+    busy,
+    pause,
+    resume,
+    flush,
+    capture,
+  };
 }

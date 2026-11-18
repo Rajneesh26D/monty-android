@@ -224,6 +224,7 @@
   color: var(--text);
   margin-top: 8px;
   margin-bottom: 24px;
+  overflow-wrap: anywhere;
 }
 .cbt-exam .passage {
   padding: 14px 18px;
@@ -241,8 +242,10 @@
   align-items: flex-start;
   gap: 12px;
   padding: 12px 14px;
-  border: 1px solid transparent;
-  border-radius: 3px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
   cursor: pointer;
   font-size: 16px;
   line-height: 1.65;
@@ -269,6 +272,7 @@
 }
 .cbt-option > .rich-text {
   min-width: 0;
+  overflow-wrap: anywhere;
 }
 .cbt-option-letter {
   flex-shrink: 0;
@@ -823,8 +827,7 @@
   }
 }
 
-/* Deliberate desktop exam-centre quirks, requested for practice. The class is
-   enabled only in non-native, wide, fine-pointer browser windows. */
+/* Wide desktop exam with a collapsible question palette and its own scrollbar. */
 @media (min-width: 1024px) and (hover: hover) and (pointer: fine) {
   .cbt-desktop-quirks {
     --cbt-palette-width: 306px;
@@ -835,14 +838,11 @@
     overflow: hidden;
   }
   .cbt-desktop-quirks .cbt-workspace {
-    width: 100%;
+    width: calc(100% - var(--cbt-palette-width));
     height: 100%;
   }
-  .cbt-desktop-quirks .cbt-question-bar,
-  .cbt-desktop-quirks .cbt-question-footer {
-    width: calc(100% - var(--cbt-palette-width));
-  }
   .cbt-desktop-quirks .cbt-question-scroll {
+    padding-right: 46px;
     overflow-x: hidden;
     scrollbar-width: none;
   }

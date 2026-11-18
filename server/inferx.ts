@@ -1,4 +1,4 @@
-import { APIError, parseModelJSON } from './models';
+import { APIError, parseModelJSON } from './provider-response';
 // Fixed provider URL/model: credentials never travel to a client-supplied host.
 export async function inferxJSON(
   prompt: string,

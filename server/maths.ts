@@ -1,4 +1,5 @@
 import { mathsOutputSchema, type MathsRequest, type MathsOutput } from '../shared/maths-extraction';
+import { geminiJSON } from './gemini';
 import { inferxJSON } from './inferx';
 import { APIError, freeModels, PRIORITY, parseModelJSON } from './models';
 const normalized = (s: string) => s.normalize('NFKC').replace(/\s+/g, ' ').trim().toLowerCase();
@@ -152,8 +153,9 @@ export async function mathsAI(
   bucket: R2Bucket,
   fetcher: typeof fetch = fetch,
   openrouterKey?: string,
+  geminiKey?: string,
 ) {
-  if (!key && !openrouterKey)
+  if (!key && !openrouterKey && !geminiKey)
     throw new APIError(
       503,
       'Question recovery is not configured. Successfully extracted questions are saved.',
@@ -188,16 +190,42 @@ export async function mathsAI(
     unknownUnresolved = result.unresolved;
     diagnostics.push({ provider, outcome: result.questions.length ? 'success' : 'invalid-output' });
   };
+  const scopeFor = () => {
+    const pending = input.targets.length ? remaining() : unknownUnresolved;
+    return {
+      ...input,
+      targets: pending,
+      answers: input.answers.filter(
+        (a) => (!pending.length || pending.includes(a.number)) && !collected.has(ref(a)),
+      ),
+      exclude: [
+        ...(input.exclude || []),
+        ...Array.from(collected.values(), (q) => ({ number: q.number, part: q.part })),
+      ],
+    };
+  };
+  if (geminiKey) {
+    const { pages, ...metadata } = input;
+    try {
+      accept(
+        await geminiJSON(mathsPrompt, metadata, geminiKey, fetcher, 65000, pages),
+        input,
+        'Gemini Flash',
+      );
+    } catch (error) {
+      diagnostics.push(diagnostic('Gemini Flash', error));
+    }
+  }
   // A replacement glyph/watermark must never silently exclude the text provider.
   // Send readable text to InferX even when image fallback is also available.
-  if (key && input.pages.some((p) => p.text.trim().length > 30)) {
+  if (!complete() && key && input.pages.some((p) => p.text.trim().length > 30)) {
     const textInput = {
-      ...input,
+      ...scopeFor(),
       pages: input.pages.map(({ number, text }) => ({ number, text })),
     };
     try {
       accept(
-        await inferxJSON(mathsPrompt, textInput, key, fetcher, 60000),
+        await inferxJSON(mathsPrompt, textInput, key, fetcher, geminiKey ? 35000 : 60000),
         textInput,
         'InferX DeepSeek',
       );
@@ -219,18 +247,7 @@ export async function mathsAI(
         const model = models[i];
         if (!model || Date.now() > deadline - 1000) break;
         const provider = 'OpenRouter ' + model.id;
-        const pending = input.targets.length ? remaining() : unknownUnresolved;
-        const scope = {
-          ...input,
-          targets: pending,
-          answers: input.answers.filter(
-            (a) => (!pending.length || pending.includes(a.number)) && !collected.has(ref(a)),
-          ),
-          exclude: [
-            ...(input.exclude || []),
-            ...Array.from(collected.values(), (q) => ({ number: q.number, part: q.part })),
-          ],
-        };
+        const scope = scopeFor();
         try {
           const content: unknown[] = [
             {
@@ -242,12 +259,12 @@ export async function mathsAI(
             },
             ...scope.pages
               .filter((p) => p.image)
-              .map((p) => ({ type: 'image_url', image_url: { url: p.image } })),
+              .flatMap((p) => [
+                { type: 'text', text: `Image for page ${p.number}:` },
+                { type: 'image_url', image_url: { url: p.image } },
+              ]),
           ];
-          const milliseconds = Math.max(
-            1000,
-            Math.min(20000, Math.floor((deadline - Date.now()) / Math.max(1, models.length - i))),
-          );
+          const milliseconds = Math.max(1000, Math.min(20000, deadline - Date.now()));
           const response = await fetcher('https://openrouter.ai/api/v1/chat/completions', {
             method: 'POST',
             headers: {
@@ -288,7 +305,7 @@ export async function mathsAI(
             });
             // Models on this account share the daily quota/key. Trying ten more
             // model names cannot repair an exhausted account or invalid credential.
-            if (quota) break;
+            if (quota || response.status === 401) break;
             continue;
           }
           const data = (await response.json()) as any;

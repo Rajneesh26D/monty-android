@@ -2,6 +2,7 @@ import { test, expect, type Page } from '@playwright/test';
 import { upgradeState } from '../../shared/migrate';
 import { emptyState } from '../../shared/types';
 import { bankSchema } from '../../shared/monty';
+import { blankEntry } from '../../src/core/vocabulary';
 import { review } from './contrast';
 const meaning = {
   word: 'resilient',
@@ -56,11 +57,14 @@ async function prepare(
   appearance: { mode: string; color: string },
   readerTheme = 'midnight',
   populated = true,
+  vocabularySheets = false,
 ) {
   await page.addInitScript(
     ({ appearance, readerTheme }) => {
-      localStorage.setItem('monty-appearance-v2', JSON.stringify(appearance));
-      localStorage.setItem('monty-reader-theme', readerTheme);
+      if (!localStorage.getItem('monty-appearance-v2'))
+        localStorage.setItem('monty-appearance-v2', JSON.stringify(appearance));
+      if (!localStorage.getItem('monty-reader-theme'))
+        localStorage.setItem('monty-reader-theme', readerTheme);
     },
     { appearance, readerTheme },
   );
@@ -91,6 +95,30 @@ async function prepare(
         }
       : {},
   };
+  if (vocabularySheets)
+    for (let sheet = 1; sheet <= 3; sheet++) {
+      const doc = {
+        id: `sheet-${sheet}`,
+        name: `Vocabulary sheet ${sheet}`,
+        hash: `sheet-${sheet}`,
+        entryIds: [] as string[],
+        pendingPages: [],
+        status: 'ready' as const,
+        createdAt: sheet,
+        parserVersion: 3,
+      };
+      for (let number = 1; number <= 30; number++) {
+        const entry = {
+          ...blankEntry(`Term ${sheet}.${number}`),
+          meaningEn: 'Definition',
+          synonyms: [{ term: 'Similar', explanation: '' }],
+          antonyms: [{ term: 'Opposite', explanation: '' }],
+        };
+        state.entries[entry.id] = entry;
+        doc.entryIds.push(entry.id);
+      }
+      state.documents.push(doc);
+    }
   state.monty!.folders['qa-maths'] = {
     id: 'qa-maths',
     area: 'maths',
@@ -268,3 +296,86 @@ for (const appearance of appearances)
     await page.getByRole('button', { name: 'Analyse answers' }).click();
     await review(page, info, 'answer-analysis');
   });
+
+test('English quizzes list new tests and run a combined range with no countdown', async ({
+  page,
+}, info) => {
+  await prepare(page, { mode: 'light', color: 'violet' }, 'paper', true, true);
+  await page.getByRole('button', { name: 'English', exact: false }).first().click();
+  await page.getByRole('button', { name: 'Vocab', exact: true }).first().click();
+  await page.getByRole('button', { name: /^Anto \/ Syno/ }).click();
+  await page.getByRole('button', { name: 'Quiz', exact: true }).click();
+  await page.getByRole('checkbox', { name: /Vocabulary sheet 1/ }).check();
+  await page.getByRole('checkbox', { name: /Vocabulary sheet 3/ }).check();
+  await expect(page.getByText(/60 questions available/)).toBeVisible();
+  await page.getByLabel('Choose questions').fill('30 to 31');
+  await page.getByRole('button', { name: 'Create test', exact: true }).click();
+  const dialog = page.getByRole('dialog');
+  await dialog.getByRole('button', { name: 'No timer' }).click();
+  await dialog.getByRole('button', { name: 'Create test', exact: true }).click();
+  const saved = page.getByRole('region', { name: 'Saved tests' });
+  await expect(saved.getByText('2 questions · Untimed', { exact: false })).toBeVisible();
+  await saved.getByRole('button', { name: 'Start test', exact: true }).click();
+  await expect(dialog.getByRole('button', { name: 'No timer' })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  await dialog.getByRole('button', { name: 'Start test', exact: true }).click();
+  await expect(page.getByRole('region', { name: 'Exam question' })).toBeVisible();
+  await expect(page.getByRole('timer')).toHaveCount(0);
+  await expect(page.getByText('Term 1.30', { exact: true })).toBeVisible();
+  const choice = page.getByRole('group', { name: 'Classify Similar' });
+  await choice.getByRole('button', { name: 'Synonym', exact: true }).click();
+  await page.getByRole('button', { name: 'Clear Response', exact: true }).click();
+  await expect(choice.getByRole('button', { name: 'Synonym', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'false',
+  );
+  await choice.getByRole('button', { name: 'Synonym', exact: true }).click();
+  await page.getByRole('button', { name: 'Mark for Review & Next', exact: true }).click();
+  await expect(page.getByText('Term 3.1', { exact: true })).toBeVisible();
+  await review(page, info, 'untimed-vocabulary-exam');
+  await page.getByRole('button', { name: 'Submit test', exact: true }).first().click();
+  await page.getByRole('button', { name: 'Confirm submission', exact: true }).click();
+  await expect(page.getByText('Test completed', { exact: true })).toBeVisible();
+  await review(page, info, 'vocabulary-result');
+  await page.getByRole('button', { name: 'Analyse answers' }).click();
+  await review(page, info, 'vocabulary-analysis');
+  await page.locator('.analysis').getByRole('button', { name: 'Results', exact: true }).click();
+  await page.getByRole('button', { name: 'Reattempt test' }).click();
+  await dialog.getByRole('checkbox', { name: 'Shuffle answer options' }).check();
+  await dialog.getByRole('button', { name: '5 min', exact: true }).click();
+  await dialog.getByRole('button', { name: 'Start reattempt' }).click();
+  await expect(page.getByRole('timer')).toBeVisible();
+});
+
+test('red and AMOLED presets stay selected across navigation and reload', async ({
+  page,
+}, info) => {
+  await prepare(page, { mode: 'dark', color: 'amoled' });
+  const settings = async () => {
+    await page.getByRole('button', { name: 'Open navigation', exact: true }).click();
+    await page
+      .getByRole('dialog', { name: 'Menu', exact: true })
+      .getByRole('button', { name: 'Settings', exact: true })
+      .click();
+  };
+  await settings();
+  await page.getByRole('button', { name: 'Red light', exact: true }).click();
+  await expect(page.locator('html')).toHaveAttribute('data-mode', 'light');
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'red');
+  await review(page, info, 'red-light-appearance');
+  await page.getByRole('button', { name: 'Back', exact: true }).click();
+  await expect(page.getByRole('button', { name: /Switch to (light|dark) theme/ })).toHaveCount(0);
+  await page.reload();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'red');
+  await settings();
+  await expect(page.getByRole('button', { name: 'Red light', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  await page.getByRole('button', { name: 'AMOLED dark', exact: true }).click();
+  await expect(page.locator('html')).toHaveAttribute('data-mode', 'dark');
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'amoled');
+  await review(page, info, 'amoled-appearance');
+});

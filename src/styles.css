@@ -219,7 +219,6 @@ textarea {
   padding: 11px 17px;
   font-size: 13px;
   font-weight: 650;
-  transition: background 0.15s;
 }
 .primary {
   background: var(--green);

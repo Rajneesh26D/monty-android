@@ -1,6 +1,7 @@
 import { lookupWord } from './reading';
 import { lookupRequestSchema } from '../shared/reading';
 import { parseQuestionSelection, formatQuestionSelection } from '../shared/question-selection';
+import { geminiJSON, logProviderFailure } from './gemini';
 import { inferxJSON } from './inferx';
 import { mathsRequestSchema } from '../shared/maths-extraction';
 import { mathsAI } from './maths';
@@ -8,14 +9,15 @@ import { multipart } from './multipart';
 import { storeUpload } from './uploads';
 import { processSchema } from '../shared/validation';
 import { stateSchema } from '../shared/state-schema';
-import { APIError, PRIORITY, parseModelJSON } from './models';
+import { APIError, PRIORITY, parseModelJSON, runAI } from './models';
 import { generalRequestSchema } from '../shared/general';
 import { generalAI } from './general';
 import { cachedAI } from './cache';
 import { authorizeDevice, deviceRoutes } from './devices';
 interface Env {
   BUCKET: R2Bucket;
-  OPENROUTER_API_KEY: string;
+  OPENROUTER_API_KEY?: string;
+  GEMINI_API_KEY?: string;
   INFERX_API_KEY?: string;
   MONTY_GATEWAY_ORIGIN?: string;
 }
@@ -67,7 +69,7 @@ export function createWorker(assets: Assets) {
           return json({
             ok: true,
             storage: !!env.BUCKET,
-            ai: !!(env.INFERX_API_KEY || env.OPENROUTER_API_KEY),
+            ai: !!(env.GEMINI_API_KEY || env.INFERX_API_KEY || env.OPENROUTER_API_KEY),
           });
         if (!env.BUCKET)
           return json(
@@ -209,7 +211,10 @@ export function createWorker(assets: Assets) {
           const text = await request.text();
           if (text.length > 8000000) return json({ error: 'Processing chunk too large' }, 413);
           const body = JSON.parse(text);
-          if (body.area === 'maths' || body.task === 'recover-questions') {
+          if (
+            body.task === 'recover-questions' ||
+            (body.area === 'maths' && body.task !== 'study')
+          ) {
             const parsed = mathsRequestSchema.safeParse(body);
             if (!parsed.success) return json({ error: 'Invalid maths source pages' }, 400);
             return json(
@@ -219,12 +224,13 @@ export function createWorker(assets: Assets) {
                 env.BUCKET,
                 fetch,
                 env.OPENROUTER_API_KEY,
+                env.GEMINI_API_KEY,
               ),
             );
           }
           const parsed = generalRequestSchema.safeParse(body);
           if (!parsed.success) return json({ error: 'Invalid study pages' }, 400);
-          if (!env.OPENROUTER_API_KEY && !env.INFERX_API_KEY)
+          if (!env.GEMINI_API_KEY && !env.OPENROUTER_API_KEY && !env.INFERX_API_KEY)
             return json({ error: 'AI is unavailable; your import is saved.' }, 503);
           return json(
             await generalAI(
@@ -233,6 +239,7 @@ export function createWorker(assets: Assets) {
               env.BUCKET,
               fetch,
               env.INFERX_API_KEY,
+              env.GEMINI_API_KEY,
             ),
           );
         }
@@ -248,7 +255,15 @@ export function createWorker(assets: Assets) {
             const input = lookupRequestSchema.safeParse(raw);
             if (!input.success)
               return json({ error: 'Select a single English word from the article.' }, 400);
-            return json(await lookupWord(input.data, env.OPENROUTER_API_KEY, env.BUCKET));
+            return json(
+              await lookupWord(
+                input.data,
+                env.OPENROUTER_API_KEY,
+                env.BUCKET,
+                fetch,
+                env.GEMINI_API_KEY,
+              ),
+            );
           }
           if (raw.mode === 'question-selection') {
             if (
@@ -264,21 +279,42 @@ export function createWorker(assets: Assets) {
                 selection: formatQuestionSelection(parseQuestionSelection(raw.text, raw.total)),
               });
             } catch {}
-            if (!env.INFERX_API_KEY && !env.OPENROUTER_API_KEY)
+            if (!env.GEMINI_API_KEY && !env.INFERX_API_KEY && !env.OPENROUTER_API_KEY)
               return json(
                 { error: 'AI interpretation is unavailable. Enter explicit numbers and ranges.' },
                 503,
               );
             const prompt =
               'Interpret only a question-number selection. Return JSON {"selection":"1,2,5 to 20"}. Ranges are inclusive. Do not invent numbers. If ambiguous return {"selection":""}.';
-            let result: { selection: string };
-            if (env.INFERX_API_KEY)
-              result = (await inferxJSON(
-                prompt,
-                { text: raw.text, total: raw.total },
-                env.INFERX_API_KEY,
-              )) as { selection: string };
-            else {
+            const selection = (result: unknown) => {
+              const value = (result as { selection?: unknown } | null)?.selection;
+              if (typeof value !== 'string') throw new Error('Invalid selection');
+              return formatQuestionSelection(parseQuestionSelection(value, raw.total));
+            };
+            const input = { text: raw.text, total: raw.total };
+            if (env.GEMINI_API_KEY) {
+              try {
+                return json({
+                  selection: selection(
+                    await geminiJSON(prompt, input, env.GEMINI_API_KEY, fetch, 35000),
+                  ),
+                });
+              } catch (error) {
+                logProviderFailure('Gemini Flash', error);
+              }
+            }
+            if (env.INFERX_API_KEY) {
+              try {
+                return json({
+                  selection: selection(
+                    await inferxJSON(prompt, input, env.INFERX_API_KEY, fetch, 30000),
+                  ),
+                });
+              } catch (error) {
+                logProviderFailure('InferX', error);
+              }
+            }
+            if (env.OPENROUTER_API_KEY) {
               const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
                 method: 'POST',
                 headers: {
@@ -300,26 +336,20 @@ export function createWorker(assets: Assets) {
                   { error: 'AI is busy. You can still use explicit numbers and ranges.' },
                   503,
                 );
-              const data = (await response.json()) as any;
-              result = parseModelJSON(data.choices?.[0]?.message?.content ?? '') as {
-                selection: string;
-              };
+              try {
+                const data = (await response.json()) as any;
+                return json({
+                  selection: selection(parseModelJSON(data.choices?.[0]?.message?.content ?? '')),
+                });
+              } catch {}
             }
-            try {
-              return json({
-                selection: formatQuestionSelection(
-                  parseQuestionSelection(result.selection, raw.total),
-                ),
-              });
-            } catch {
-              return json(
-                {
-                  error:
-                    'Could not interpret safely. Please use explicit question numbers and ranges.',
-                },
-                400,
-              );
-            }
+            return json(
+              {
+                error:
+                  'Could not interpret safely. Please use explicit question numbers and ranges.',
+              },
+              400,
+            );
           }
           const parsed = processSchema.safeParse(raw);
           if (!parsed.success) return json({ error: 'Invalid processing batch' }, 400);
@@ -330,9 +360,17 @@ export function createWorker(assets: Assets) {
               (!input.entries.length || input.entries.some((e) => !e.candidateId)))
           )
             return json({ error: 'Supply source pages or vocabulary candidates' }, 400);
-          if (!env.OPENROUTER_API_KEY)
+          if (!env.GEMINI_API_KEY && !env.INFERX_API_KEY && !env.OPENROUTER_API_KEY)
             return json({ error: 'AI is temporarily unavailable. Your import is saved.' }, 503);
-          return json(await cachedAI(input, env.OPENROUTER_API_KEY, env.BUCKET));
+          return json(
+            await cachedAI(
+              input,
+              env.OPENROUTER_API_KEY ?? '',
+              env.BUCKET,
+              (batch, key, beforeCall) =>
+                runAI(batch, key, beforeCall, fetch, env.GEMINI_API_KEY, env.INFERX_API_KEY),
+            ),
+          );
         }
         return json({ error: 'Not found' }, 404);
       } catch (error) {

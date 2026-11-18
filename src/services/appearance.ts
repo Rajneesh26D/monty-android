@@ -13,15 +13,21 @@ export const themeColors = [
 ] as const;
 export type ThemeColor = (typeof themeColors)[number];
 export type Appearance = { mode: 'dark' | 'light'; color: ThemeColor };
+export const darkOnlyThemes: readonly ThemeColor[] = ['amoled', 'black', 'youtube'];
 const key = 'monty-appearance-v2';
 const defaultAppearance: Appearance = { mode: 'dark', color: 'amoled' };
 let current: Appearance = defaultAppearance;
 const listeners = new Set<() => void>();
+function normalize(value: Appearance): Appearance {
+  return darkOnlyThemes.includes(value.color) && value.mode === 'light'
+    ? { ...value, mode: 'dark' }
+    : value;
+}
 function read(): Appearance {
   try {
     const value = JSON.parse(localStorage.getItem(key) ?? 'null');
     if (value && ['dark', 'light'].includes(value.mode) && themeColors.includes(value.color))
-      return value;
+      return normalize(value);
   } catch {
     /* Keep the default when storage is unavailable or invalid. */
   }
@@ -44,11 +50,9 @@ export function initializeAppearance() {
   });
 }
 export function setAppearance(value: Appearance) {
-  if (value.mode === 'light' && ['amoled', 'black', 'youtube'].includes(value.color))
-    value = { ...value, color: 'violet' };
-  current = value;
+  current = normalize(value);
   try {
-    localStorage.setItem(key, JSON.stringify(value));
+    localStorage.setItem(key, JSON.stringify(current));
   } catch {
     /* Still apply for this session. */
   }

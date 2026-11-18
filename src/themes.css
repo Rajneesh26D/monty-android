@@ -280,25 +280,12 @@ input[type='checkbox'] {
   display: grid;
   gap: 12px;
 }
-.appearance-modes {
+.theme-group {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
+  gap: 8px;
 }
-.appearance-modes button {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  padding: 14px;
-  background: var(--surface-soft);
-}
-.appearance-modes button.selected {
-  border-color: var(--accent);
-  background: var(--accent-soft);
-  color: var(--accent);
+.theme-group h3 {
+  font-size: 15px;
 }
 .theme-options {
   display: grid;
@@ -344,6 +331,10 @@ input[type='checkbox'] {
 }
 [data-swatch='teal'] .theme-swatch {
   background: #89dfcf;
+}
+[data-swatch-mode='light'] .theme-swatch {
+  border: 2px solid #fff;
+  outline: 1px solid #637084;
 }
 .timer-dialog {
   width: min(460px, calc(100vw - 28px));

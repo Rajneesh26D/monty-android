@@ -60,7 +60,10 @@ export function useTestSetup() {
           onSubmit={(event) => {
             event.preventDefault();
             const value = Number(minutes);
-            if (Number.isInteger(value) && value >= 1 && value <= MAX_TIMER_MINUTES)
+            if (
+              minutes === '0' ||
+              (Number.isInteger(value) && value >= 1 && value <= MAX_TIMER_MINUTES)
+            )
               close({ minutes: value, ...customization });
           }}
         >
@@ -87,7 +90,7 @@ export function useTestSetup() {
           <p className="muted timer-test-name">{request.name}</p>
           <p>Start with 15 minutes, or choose the time you need.</p>
           <div className="timer-presets" aria-label="Suggested durations">
-            {[5, 15, 30, 60].map((value) => (
+            {[5, 15, 30, 60, 0].map((value) => (
               <button
                 type="button"
                 key={value}
@@ -95,24 +98,26 @@ export function useTestSetup() {
                 className={Number(minutes) === value ? 'selected' : ''}
                 onClick={() => setMinutes(String(value))}
               >
-                {value} min
+                {value === 0 ? 'No timer' : `${value} min`}
               </button>
             ))}
           </div>
-          <label className="field">
-            Duration in minutes
-            <input
-              autoFocus
-              required
-              type="number"
-              inputMode="numeric"
-              min={1}
-              max={MAX_TIMER_MINUTES}
-              step={1}
-              value={minutes}
-              onChange={(event) => setMinutes(event.target.value)}
-            />
-          </label>
+          {minutes !== '0' && (
+            <label className="field">
+              Duration in minutes
+              <input
+                autoFocus
+                required
+                type="number"
+                inputMode="numeric"
+                min={1}
+                max={MAX_TIMER_MINUTES}
+                step={1}
+                value={minutes}
+                onChange={(event) => setMinutes(event.target.value)}
+              />
+            </label>
+          )}
           <QuizOrderControls value={customization} onChange={setCustomization} />
           {request.count > 1 && (
             <p className="muted">

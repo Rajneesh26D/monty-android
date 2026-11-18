@@ -26,6 +26,7 @@ export const clockSchema = z.object({
     .min(60000)
     .max(MAX_TIMER_MINUTES * 60000)
     .optional(),
+  untimed: z.boolean().optional(),
   remainingMs: z
     .number()
     .min(0)
@@ -106,7 +107,7 @@ export const examSchema = z.object({
   questionIds: z.array(z.string()).min(1),
   customization: quizCustomizationSchema.optional(),
   selectionNumbers: z.array(z.number().int().positive()).optional(),
-  durationMinutes: z.number().int().min(1).max(525600).optional(),
+  durationMinutes: z.number().int().min(0).max(MAX_TIMER_MINUTES).optional(),
   createdAt: z.number(),
   draft: z
     .object({
@@ -206,9 +207,15 @@ export const emptyWorkspace = (): Workspace => ({
   seedVersion: 0,
 });
 export const freshClock = (minutes = DEFAULT_TIMER_MINUTES): AttemptClock => ({
-  durationMs: timerDuration(minutes),
-  remainingMs: timerDuration(minutes),
+  ...(minutes === 0 ? { untimed: true } : { durationMs: timerDuration(minutes) }),
+  remainingMs: minutes === 0 ? 0 : timerDuration(minutes),
   spent: {},
   updatedAt: Date.now(),
   paused: true,
 });
+
+export function clockElapsed(clock: AttemptClock) {
+  return clock.untimed
+    ? Object.values(clock.spent).reduce((total, spent) => total + spent, 0)
+    : (clock.durationMs ?? DEFAULT_DURATION_MS) - clock.remainingMs;
+}

@@ -1,9 +1,24 @@
 import * as pdfjs from 'pdfjs-dist/legacy/build/pdf.mjs';
 import PdfWorker from './worker?worker';
 import { linesOf, type PageData, type TextItem } from './parser';
-pdfjs.GlobalWorkerOptions.workerPort = new PdfWorker();
 export async function openPdf(data: Uint8Array) {
-  const pdf = await pdfjs.getDocument({ data }).promise;
+  const port = new PdfWorker();
+  const worker = pdfjs.PDFWorker.create({ port });
+  const task = pdfjs.getDocument({ data, worker });
+  const close = async () => {
+    try {
+      await task.destroy();
+    } finally {
+      worker.destroy();
+      port.terminate();
+    }
+  };
+  const pdf = await task.promise.catch(async (error) => {
+    await close();
+    if (error?.name === 'PasswordException')
+      throw new Error('Unlock this PDF before importing it.');
+    throw error;
+  });
   return {
     count: pdf.numPages,
     async page(number: number): Promise<PageData> {
@@ -20,18 +35,20 @@ export async function openPdf(data: Uint8Array) {
           height: i.height,
           fontName: i.fontName,
         }));
-      const operators = items.some((i) => i.text.trim()) ? null : await page.getOperatorList();
+      const text = linesOf(items).join('\n');
+      const operators = text.trim().length >= 100 ? null : await page.getOperatorList();
       const imageOps = [
         pdfjs.OPS.paintImageXObject,
         pdfjs.OPS.paintInlineImageXObject,
         pdfjs.OPS.paintImageMaskXObject,
+        pdfjs.OPS.constructPath,
       ];
       const result: PageData = {
         number,
         width: viewport.width,
         height: viewport.height,
         items,
-        text: linesOf(items).join('\n'),
+        text,
         hasVisualContent: !!operators?.fnArray.some((op) => imageOps.includes(op)),
       };
       page.cleanup();
@@ -54,9 +71,14 @@ export async function openPdf(data: Uint8Array) {
       const canvas = document.createElement('canvas');
       canvas.width = Math.ceil(viewport.width);
       canvas.height = Math.ceil(viewport.height);
-      await page.render({ canvas, viewport }).promise;
-      return canvas.toDataURL('image/jpeg', 0.83);
+      try {
+        await page.render({ canvas, viewport }).promise;
+        return canvas.toDataURL('image/jpeg', 0.83);
+      } finally {
+        page.cleanup();
+        canvas.width = canvas.height = 0;
+      }
     },
-    close: () => pdf.destroy(),
+    close,
   };
 }

@@ -1,5 +1,5 @@
 import type { Exam, Bank, AttemptClock, MCQ } from '../../shared/monty';
-import { freshClock, DEFAULT_DURATION_MS } from '../../shared/monty';
+import { freshClock, clockElapsed } from '../../shared/monty';
 import { uid } from '../../shared/types';
 import { splitItems } from './quiz';
 import { applyOrder, createAttemptOrder, presentQuestions } from './quizOrder';
@@ -129,7 +129,7 @@ export function finishExam(test: Exam, bank: Bank): Exam {
       unanswered,
       total: test.questionIds.length,
       spent: d.clock.spent,
-      elapsedMs: (d.clock.durationMs ?? DEFAULT_DURATION_MS) - d.clock.remainingMs,
+      elapsedMs: clockElapsed(d.clock),
     },
   };
 }
@@ -138,10 +138,10 @@ export function advanceClock(
   questionId: string,
   elapsed: number,
 ): AttemptClock {
-  const delta = Math.min(clock.remainingMs, Math.max(0, elapsed));
+  const delta = Math.max(0, clock.untimed ? elapsed : Math.min(clock.remainingMs, elapsed));
   return {
     ...clock,
-    remainingMs: clock.remainingMs - delta,
+    remainingMs: clock.untimed ? 0 : clock.remainingMs - delta,
     spent: { ...clock.spent, [questionId]: (clock.spent[questionId] ?? 0) + delta },
     updatedAt: Date.now(),
     paused: clock.paused,

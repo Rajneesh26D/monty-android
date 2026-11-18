@@ -32,7 +32,10 @@ it.each(['amoled', 'black', 'youtube', 'red', 'yellow'] as const)(
     expect(root.dataset.theme).toBe(color);
   },
 );
-it('supports switching back to a usable light theme from a dark-only preset', () => {
+it('keeps dark-only themes dark and saves explicit light themes', () => {
   setAppearance({ mode: 'light', color: 'amoled' });
-  expect(root.dataset).toMatchObject({ mode: 'light', theme: 'violet' });
+  expect(root.dataset).toMatchObject({ mode: 'dark', theme: 'amoled' });
+  setAppearance({ mode: 'light', color: 'red' });
+  initializeAppearance();
+  expect(root.dataset).toMatchObject({ mode: 'light', theme: 'red' });
 });

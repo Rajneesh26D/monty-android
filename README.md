@@ -88,6 +88,9 @@ relay. Its R2 bucket stores release APKs/metadata only. Its runtime values are:
 - `MONTY_UPSTREAM_TOKEN`: server-only Sites service access, stored as a secret.
 - `MONTY_UPLOAD_TOKEN`: release upload authorization, stored as a secret.
 
+The original Site reads `GEMINI_API_KEY` as a server-only runtime secret.
+For uncached AI work it tries Gemini Flash first. PDF text can fall back to
+InferX, and OpenRouter supplies compatible text or image models when needed.
 The original Site also has `MONTY_GATEWAY_ORIGIN`. Preserve its private
 access policy. A public mobile endpoint requires explicit owner authorization;
 only APKs are anonymous downloads. All study API requests require a paired

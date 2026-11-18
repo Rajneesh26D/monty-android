@@ -75,7 +75,6 @@
 .app-header .cloud-status::before {
   background: var(--success);
 }
-.app-header .header-theme,
 .navigation-toggle {
   flex-shrink: 0;
   min-width: 44px;
