@@ -305,7 +305,7 @@ export function ComputerExam({
                   disabled={working || timer.busy}
                   onClick={() => void run(timer.resume)}
                 >
-                  Resume timer
+                  {timer.untimed ? 'Resume test' : 'Resume timer'}
                 </button>
               </div>
             )}

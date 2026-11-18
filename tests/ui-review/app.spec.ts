@@ -379,3 +379,23 @@ test('red and AMOLED presets stay selected across navigation and reload', async 
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'amoled');
   await review(page, info, 'amoled-appearance');
 });
+
+test('a newly saved maths quiz starts immediately and accepts an answer', async ({ page }) => {
+  await prepare(page, { mode: 'dark', color: 'red' });
+  await page.getByRole('button', { name: 'Maths', exact: false }).first().click();
+  await page.getByRole('button', { name: /^QA Maths/ }).click();
+  await page.locator('.folder-nav').getByRole('button', { name: 'Tests', exact: true }).click();
+  await page.getByRole('checkbox', { name: /Number practice/ }).check();
+  await page.getByLabel('Choose questions').fill('1');
+  await page.getByRole('button', { name: 'Create test', exact: true }).click();
+  const dialog = page.getByRole('dialog');
+  await dialog.getByRole('button', { name: 'Create test', exact: true }).click();
+  const created = page
+    .locator('.test-card')
+    .filter({ has: page.getByRole('heading', { name: 'Number practice', exact: true }) });
+  await created.getByRole('button', { name: 'Start test', exact: true }).click();
+  await dialog.getByRole('button', { name: 'Start test', exact: true }).click();
+  await page.getByRole('radio', { name: /30$/ }).check();
+  await expect(page.getByRole('radio', { name: /30$/ })).toBeChecked();
+  await expect(page.getByText('Test paused', { exact: true })).toHaveCount(0);
+});

@@ -132,24 +132,25 @@ export function StudyFolder({
       notify(e instanceof Error ? e.message : 'Could not complete this action.');
     }
   }
+  const visibleBankId = active?.bankId ?? result?.bankId ?? selected?.bankId ?? review?.bankId;
   useEffect(() => {
+    if (!visibleBankId) {
+      setBank(null);
+      return;
+    }
+    if (bank?.id === visibleBankId) return;
     let valid = true;
-    const id =
-      active?.bankId ??
-      result?.bankId ??
-      (selectedPdf ? w.attachments[selectedPdf]?.bankId : undefined) ??
-      review?.bankId;
-    setBank(null);
-    if (id)
-      void readBank(id)
-        .then((b) => {
-          if (valid) setBank(b);
-        })
-        .catch((e) => notify(e.message));
+    void readBank(visibleBankId)
+      .then((loaded) => {
+        if (valid) setBank(loaded);
+      })
+      .catch((error) => {
+        if (valid) notify(error.message);
+      });
     return () => {
       valid = false;
     };
-  }, [active?.bankId, result?.bankId, selectedPdf, review?.bankId]);
+  }, [visibleBankId, bank?.id]);
   const navigate = (next: Tab) => {
     setTab(next);
     setSelectedPdf(null);
@@ -330,8 +331,6 @@ export function StudyFolder({
     notify('Test created. Start it when you are ready.');
     await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
     document.getElementById(generated[0].id)?.scrollIntoView({ block: 'nearest' });
-    setBank(combined);
-    setResultId(null);
   }
   async function deleteFile(file: Attachment) {
     if (!confirm(`Delete “${file.name}”? Existing tests and their results will remain.`)) return;
@@ -449,7 +448,7 @@ export function StudyFolder({
       questionRef(bank!.id, q.id),
     ) ?? false;
   if (active?.draft) {
-    if (!bank) return <p>Opening saved questions…</p>;
+    if (!bank || bank.id !== active.bankId) return <p>Opening saved questions…</p>;
     return (
       <ExamScreen
         test={active}
@@ -468,7 +467,7 @@ export function StudyFolder({
     );
   }
   if (result?.latest) {
-    if (!bank) return <p>Opening result…</p>;
+    if (!bank || bank.id !== result.bankId) return <p>Opening result…</p>;
     return analysis ? (
       <ExamAnalysis
         key={result.id}
@@ -556,7 +555,7 @@ export function StudyFolder({
             onBack={mathSaved ? () => setMathSaved(false) : undefined}
           />
         ) : tab === 'practice' ? (
-          selectedPdf && selected && bank ? (
+          selected && bank && bank.id === selected.bankId ? (
             <>
               <div className="practice-sheet-toolbar">
                 <button
@@ -893,7 +892,7 @@ export function StudyFolder({
           </button>
         ))}
       </nav>
-      {review && bank && (
+      {review && bank && bank.id === review.bankId && (
         <BankEditor
           bank={bank}
           onClose={() => setReview(null)}
