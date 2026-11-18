@@ -52,7 +52,8 @@ export function validateMaths(value: unknown, input: MathsRequest) {
       q.answerOrigin = 'pdf';
     } else {
       q.answerOrigin = 'ai';
-      if (q.explanation.trim().length < 12) throw new Error('AI answer needs a reason');
+      if (q.explanation.trim().length < 12 && (q.sourceSolution?.text.trim().length ?? 0) < 12)
+        throw new Error('AI answer needs a reason');
     }
   }
   // Incomplete coverage stays visible; it cannot silently become a successful import.

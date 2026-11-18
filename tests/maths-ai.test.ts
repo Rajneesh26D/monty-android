@@ -41,6 +41,29 @@ it('labels answers without a supplied key as AI and requires a reason', () => {
     ).questions[0].answerOrigin,
   ).toBe('ai');
 });
+it('accepts verified workings as the reason for the recovered answer', () => {
+  const text = 'Two plus three equals five.';
+  const noKey = {
+    ...input,
+    pages: [{ number: 2, text: input.pages[0].text + '\nSolution: ' + text }],
+    answers: [],
+  };
+  const sourceSolution = { text, pages: [2] };
+  expect(
+    validateMaths({ questions: [{ ...question, sourceSolution }] }, noKey).questions[0]
+      .sourceSolution,
+  ).toEqual(sourceSolution);
+  expect(() =>
+    validateMaths(
+      {
+        questions: [
+          { ...question, sourceSolution: { ...sourceSolution, text: 'An invented solution' } },
+        ],
+      },
+      noKey,
+    ),
+  ).toThrow('AI answer needs a reason');
+});
 it('calls only the fixed provider, keeps credentials in the Authorization header and rejects truncation', async () => {
   const fetcher = vi.fn().mockResolvedValue(
     new Response(
