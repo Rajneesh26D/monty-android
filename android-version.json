@@ -1,5 +1,5 @@
 {
-  "versionCode": 20120,
-  "versionName": "2.1.20",
-  "notes": "Import highlighted maths answers and retain printed worked solutions across PDF pages. Show PDF illustrations on Synonym and Antonym study cards. Selected answers retain the blue fill and checkmark."
+  "versionCode": 20121,
+  "versionName": "2.1.21",
+  "notes": "Rebuild vocabulary illustrations from saved PDFs, show their source page, and keep images tied to the PDF selected in Practice."
 }

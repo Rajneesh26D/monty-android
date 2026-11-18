@@ -2108,11 +2108,13 @@ progress::-moz-progress-bar {
   margin-top: 8px;
 }
 
-.vocabulary-image:not(:has(img)) {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  pointer-events: none;
+.vocabulary-image {
+  margin: 0;
+}
+.vocabulary-image figcaption {
+  color: var(--muted);
+  font-size: 12px;
+  margin-top: 6px;
 }
 .vocabulary-image img {
   display: block;

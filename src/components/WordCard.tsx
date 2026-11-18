@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import { Bookmark, Pencil, Sparkles } from 'lucide-react';
 import { VocabularyImage } from './VocabularyImage';
 import type { Entry } from '../../shared/types';
@@ -15,17 +16,20 @@ export function BookmarkButton({ saved, onClick }: { saved: boolean; onClick: ()
 }
 export function WordCard({
   entry,
+  sourceDocumentId,
   saved,
   onBookmark,
   onEdit,
 }: {
   entry: Entry;
+  sourceDocumentId?: string;
   saved: boolean;
   onBookmark: () => void;
   onEdit?: () => void;
 }) {
+  const card = useRef<HTMLElement>(null);
   return (
-    <article className="word-card" data-study-id={entry.id}>
+    <article ref={card} className="word-card" data-study-id={entry.id}>
       <div className="card-heading">
         <h2>{entry.word}</h2>
         <div className="actions">
@@ -37,7 +41,13 @@ export function WordCard({
           <BookmarkButton saved={saved} onClick={onBookmark} />
         </div>
       </div>
-      <VocabularyImage word={entry.word} sources={entry.sources} />
+      <VocabularyImage
+        key={sourceDocumentId ?? 'all'}
+        word={entry.word}
+        sources={entry.sources}
+        sourceDocumentId={sourceDocumentId}
+        card={card}
+      />
       <div className="meaning">
         <h3>Meaning</h3>
         <p>{entry.meaningEn || <span className="muted">Not provided</span>}</p>

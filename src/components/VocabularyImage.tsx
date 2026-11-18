@@ -1,22 +1,40 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState, type RefObject } from 'react';
 import type { Entry } from '../../shared/types';
 import { vocabularyImage } from '../services/vocabularyImage';
 
-export function VocabularyImage({ word, sources }: Pick<Entry, 'word' | 'sources'>) {
-  const node = useRef<HTMLDivElement>(null);
-  const [image, setImage] = useState<string | null>(null);
+type Props = Pick<Entry, 'word' | 'sources'> & {
+  card: RefObject<HTMLElement | null>;
+  sourceDocumentId?: string;
+};
+
+export function VocabularyImage({ word, sources, card, sourceDocumentId }: Props) {
+  const [image, setImage] = useState<{ url: string; page: number } | null>(null);
   useEffect(() => {
-    if (!node.current || !sources.length) return;
-    let active = true;
+    const element = card.current;
+    const references = sourceDocumentId
+      ? sources.filter((source) => source.documentId === sourceDocumentId)
+      : sources;
     setImage(null);
+    if (!element || !references.length) return;
+    let active = true;
+    let loading = false;
+    let loaded = false;
+    let nearViewport = typeof IntersectionObserver === 'undefined';
     const load = async () => {
-      for (const source of sources) {
-        const result = await vocabularyImage(word, source);
-        if (!active) return;
-        if (result) {
-          setImage(result);
-          return;
+      if (!nearViewport || loading || loaded) return;
+      loading = true;
+      try {
+        for (const source of references) {
+          const url = await vocabularyImage(word, source);
+          if (!active) return;
+          if (url) {
+            loaded = true;
+            setImage({ url, page: source.page });
+            return;
+          }
         }
+      } finally {
+        loading = false;
       }
     };
     const observer =
@@ -24,23 +42,26 @@ export function VocabularyImage({ word, sources }: Pick<Entry, 'word' | 'sources
         ? undefined
         : new IntersectionObserver(
             (entries) => {
-              if (!entries.some((entry) => entry.isIntersecting)) return;
-              observer?.disconnect();
-              void load();
+              nearViewport = entries.some((entry) => entry.isIntersecting);
+              if (nearViewport) void load();
             },
             { rootMargin: '160px' },
           );
-    if (observer) observer.observe(node.current);
+    if (observer) observer.observe(element);
     else void load();
+    window.addEventListener('online', load);
     return () => {
       active = false;
       observer?.disconnect();
+      window.removeEventListener('online', load);
     };
-  }, [word, sources]);
-  if (!sources.length) return null;
+  }, [word, sources, card, sourceDocumentId]);
+
+  if (!image) return null;
   return (
-    <div ref={node} className="vocabulary-image">
-      {image && <img src={image} alt={`Illustration from the PDF for ${word}`} />}
-    </div>
+    <figure className="vocabulary-image">
+      <img src={image.url} alt={`Illustration from the PDF for ${word}`} />
+      <figcaption>PDF page {image.page}</figcaption>
+    </figure>
   );
 }

@@ -78,7 +78,7 @@ async function drain() {
               const page = await pdf.page(n);
               const bounds = illustration(page, (await pdf.graphics(n)).images, job.word);
               if (bounds) result = await pdf.image(n, bounds);
-              await saveJob(job.key, result);
+              if (result) await saveJob(job.key, result);
             } catch {
               // The word remains usable if an original image is unavailable.
             }
@@ -95,13 +95,13 @@ async function drain() {
 }
 
 export async function vocabularyImage(word: string, source: SourceRef) {
-  const key = `vocab-image-v1-${source.documentId}-${source.page}-${word.toLowerCase()}`;
+  const key = `vocab-image-v2-${source.documentId}-${source.page}-${word.toLowerCase()}`;
   const existing = inFlight.get(key);
   if (existing) return existing;
-  const result = readJob<string | null>(key)
+  const result = readJob<string>(key)
     .catch(() => undefined)
     .then((cached) =>
-      cached !== undefined
+      cached
         ? cached
         : new Promise<string | null>((resolve) => {
             pending.push({ source, word, key, resolve });

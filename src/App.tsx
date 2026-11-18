@@ -839,6 +839,9 @@ export default function App({
                           <WordCard
                             key={entry.id}
                             entry={entry}
+                            sourceDocumentId={
+                              tab === 'learn' && scope !== 'all' ? scope : undefined
+                            }
                             saved={state.bookmarks.includes(entry.id)}
                             onBookmark={() => bookmark(entry)}
                             onEdit={() => setEditing(entry)}
