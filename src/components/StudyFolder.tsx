@@ -1002,6 +1002,7 @@ function PracticeQuestions({
       </div>
       <MCQView
         maths={bank.kind === 'maths'}
+        sourceAttachmentId={attachment.id}
         question={q}
         selected={progress.answers[q.id]}
         reveal={!!progress.answers[q.id]}

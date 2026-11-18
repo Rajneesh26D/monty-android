@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { englishMathText, flowMathText } from '../core/mathsText';
 import type { MCQ } from '../../shared/monty';
+import { WorkedSolution } from './WorkedSolution';
 import { RichText } from './RichText';
 export function MCQView({
   question,
@@ -10,6 +11,7 @@ export function MCQView({
   disabled = false,
   maths = false,
   exam = false,
+  sourceAttachmentId,
 }: {
   question: MCQ;
   selected?: string;
@@ -18,6 +20,7 @@ export function MCQView({
   disabled?: boolean;
   maths?: boolean;
   exam?: boolean;
+  sourceAttachmentId?: string;
 }) {
   const [sourceText, setSourceText] = useState(
     () => localStorage.getItem('monty-maths-source') === 'true',
@@ -125,16 +128,11 @@ export function MCQView({
           </strong>
           {question.meaningHi && <p lang="hi">{question.meaningHi}</p>}
           {question.sourceSolution ? (
-            <div className="worked-solution">
-              <strong>Worked solution from the PDF</strong>
-              <p>
-                <RichText text={question.sourceSolution.text} />
-              </p>
-              <small>
-                {question.sourceSolution.pages.length === 1 ? 'Page' : 'Pages'}{' '}
-                {question.sourceSolution.pages.join(', ')}
-              </small>
-            </div>
+            <WorkedSolution
+              key={question.id}
+              question={question}
+              attachmentId={sourceAttachmentId}
+            />
           ) : (
             question.explanation && (
               <p>

@@ -2,7 +2,7 @@ import { expect, it } from 'vitest';
 import { OPS } from 'pdfjs-dist/legacy/build/pdf.mjs';
 import { pageGraphics } from '../src/pdf/graphics';
 import { linesOf, type PageData, type TextItem } from '../src/pdf/parser';
-import { workedQuestions } from '../src/pdf/workedQuestions';
+import { workedQuestions, workedSolutionRegions } from '../src/pdf/workedQuestions';
 
 const line = (text: string, y: number, x = 25): TextItem => ({
   text,
@@ -30,6 +30,7 @@ it('reads highlighted inline answers and retains their printed solutions across 
       line('Solution: 7 − 3 = 4', 145),
     ]),
   ];
+  expect(workedSolutionRegions(pages)['1-1']).toEqual([{ page: 2, bounds: [18, 64, 153, 88.6] }]);
   const answerBoxes = [
     [120, 116, 167, 130],
     [20, 116, 68, 130],

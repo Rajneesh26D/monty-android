@@ -71,11 +71,11 @@ export async function openPdf(data: Uint8Array) {
         page.cleanup();
       }
     },
-    async image(number: number, bounds?: Bounds): Promise<string> {
+    async image(number: number, bounds?: Bounds, maxScale = 2): Promise<string> {
       const page = await pdf.getPage(number),
         base = page.getViewport({ scale: 1 });
       const [x, y, right, bottom] = bounds ?? [0, 0, base.width, base.height];
-      const scale = Math.min(2, 1600 / Math.max(right - x, bottom - y));
+      const scale = Math.min(maxScale, 1600 / Math.max(right - x, bottom - y));
       const viewport = page.getViewport({ scale });
       const canvas = document.createElement('canvas');
       canvas.width = Math.ceil((right - x) * scale);
@@ -91,6 +91,27 @@ export async function openPdf(data: Uint8Array) {
         page.cleanup();
         canvas.width = canvas.height = 0;
       }
+    },
+    async textRegionImage(number: number, bounds: Bounds) {
+      const page = await pdf.getPage(number);
+      const viewport = page.getViewport({ scale: 1 });
+      const [left, top, right, bottom] = bounds;
+      const [x0, y0, x1, y1] = viewport.convertToViewportRectangle([
+        left,
+        viewport.height - bottom,
+        right,
+        viewport.height - top,
+      ]);
+      return this.image(
+        number,
+        [
+          Math.max(0, Math.min(x0, x1)),
+          Math.max(0, Math.min(y0, y1)),
+          Math.min(viewport.width, Math.max(x0, x1)),
+          Math.min(viewport.height, Math.max(y0, y1)),
+        ],
+        3,
+      );
     },
     close,
   };

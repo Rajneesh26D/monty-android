@@ -1,6 +1,6 @@
 import type { MCQ, Bank } from '../../shared/monty';
 import { mathItems } from './content';
-import type { Graphics } from './graphics';
+import type { Bounds, Graphics } from './graphics';
 import { positionedLines, type PageData } from './parser';
 
 type Line = ReturnType<typeof positionedLines>[number] & { page: number };
@@ -103,26 +103,8 @@ function markedChoice(
   return labels.length === 1 ? labels[0] : undefined;
 }
 
-export async function workedQuestions(
-  pages: PageData[],
-  id: string,
-  graphicsFor: (page: number) => Promise<Graphics>,
-): Promise<
-  | {
-      bank: Bank;
-      fragments: {
-        number: number;
-        part: string;
-        page: number;
-        pages: number[];
-        context: string;
-        text: string;
-      }[];
-      solutions: Map<number, NonNullable<MCQ['sourceSolution']>>;
-    }
-  | undefined
-> {
-  if (!pages.some((page) => page.text.split('\n').some((line) => solution.test(line)))) return;
+function workedRows(pages: PageData[]): Row[] {
+  if (!pages.some((page) => page.text.split('\n').some((line) => solution.test(line)))) return [];
   const rows: Row[] = [];
   const textPages = pages.map((page) => ({
     ...page,
@@ -163,6 +145,66 @@ export async function workedQuestions(
       }
     }
   }
+  return rows;
+}
+
+export type SolutionRegion = { page: number; bounds: Bounds };
+export type SolutionRegionIndex = Record<string, SolutionRegion[]>;
+
+export function workedSolutionRegions(pages: PageData[]): SolutionRegionIndex {
+  const regions: SolutionRegionIndex = {};
+  const pageByNumber = new Map(pages.map((page) => [page.number, page]));
+  for (const row of workedRows(pages)) {
+    if (!row.worked) continue;
+    const byPage = new Map<number, typeof row.solution>();
+    for (const line of [...choicesOf(row.question).earlierSteps, ...row.solution]) {
+      const group = byPage.get(line.page) ?? [];
+      group.push(line);
+      byPage.set(line.page, group);
+    }
+    regions[`${row.page}-${row.number}`] = Array.from(byPage).flatMap(([number, lines]) => {
+      const page = pageByNumber.get(number)!;
+      const items = lines.flatMap((line) => line.items).filter((item) => item.text.trim());
+      if (!items.length) return [];
+      const firstBaseline = Math.min(...lines.map((line) => line.y));
+      const previousBaseline = Math.max(
+        0,
+        ...row.question
+          .filter((line) => line.page === number && line.y < firstBaseline - 3)
+          .map((line) => line.y + 2),
+      );
+      const bounds: Bounds = [
+        Math.max(0, Math.min(...items.map((item) => item.x)) - 7),
+        Math.max(previousBaseline, Math.min(...items.map((item) => item.y - item.height)) - 4),
+        Math.min(page.width, Math.max(...items.map((item) => item.x + item.width)) + 8),
+        Math.min(page.height, Math.max(...items.map((item) => item.y + item.height * 0.3)) + 5),
+      ];
+      return bounds[2] > bounds[0] && bounds[3] > bounds[1] ? [{ page: number, bounds }] : [];
+    });
+  }
+  return regions;
+}
+
+export async function workedQuestions(
+  pages: PageData[],
+  id: string,
+  graphicsFor: (page: number) => Promise<Graphics>,
+): Promise<
+  | {
+      bank: Bank;
+      fragments: {
+        number: number;
+        part: string;
+        page: number;
+        pages: number[];
+        context: string;
+        text: string;
+      }[];
+      solutions: Map<number, NonNullable<MCQ['sourceSolution']>>;
+    }
+  | undefined
+> {
+  const rows = workedRows(pages);
   const parsed = rows.map((row) => ({ row, ...choicesOf(row.question) }));
   if (!parsed.some(({ options, row }) => options.length && row.worked)) return;
   const graphics = new Map<number, Graphics>();

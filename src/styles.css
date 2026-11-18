@@ -2128,3 +2128,45 @@ progress::-moz-progress-bar {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+
+.worked-solution figure {
+  margin: 8px 0;
+}
+.worked-solution figure img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 6px;
+}
+.worked-solution figcaption {
+  color: var(--muted);
+  font-size: 12px;
+  margin-top: 5px;
+}
+.worked-solution details summary {
+  cursor: pointer;
+}
+.worked-solution-dialog {
+  width: min(95vw, 1000px);
+  max-height: 85vh;
+  max-height: 85dvh;
+  padding: 0;
+}
+.worked-solution-dialog::backdrop {
+  background: var(--overlay);
+}
+.worked-solution-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px;
+}
+.worked-solution-scroll {
+  overflow: auto;
+  max-height: 68vh;
+  padding: 8px 12px 14px;
+}
+.worked-solution-scroll figure {
+  width: 850px;
+}
