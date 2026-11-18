@@ -36,6 +36,10 @@ export const clockSchema = z.object({
   paused: z.boolean().default(true),
 });
 export type AttemptClock = z.infer<typeof clockSchema>;
+export const sourceSolutionSchema = z.object({
+  text: z.string().min(1).max(18000),
+  pages: z.array(z.number().int().positive()).min(1).max(30),
+});
 export const mcqSchema = z
   .object({
     id: z.string(),
@@ -55,6 +59,7 @@ export const mcqSchema = z
     answerOrigin: z.enum(['pdf', 'ai']).default('pdf'),
     evidence: z.string().default(''),
     explanation: z.string().default(''),
+    sourceSolution: sourceSolutionSchema.optional(),
   })
   .refine((q) => q.options.some((o) => o.id === q.answerId), 'Answer must match an option');
 export type MCQ = z.infer<typeof mcqSchema>;

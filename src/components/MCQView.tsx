@@ -124,13 +124,32 @@ export function MCQView({
               : 'Answer review'}
           </strong>
           {question.meaningHi && <p lang="hi">{question.meaningHi}</p>}
-          {question.explanation && <p>{question.explanation}</p>}
-          <small>
-            {question.answerOrigin === 'ai'
-              ? 'AI-generated answer, grounded in the source'
-              : 'Answer supplied by the PDF'}{' '}
-            · Page {question.page}
-          </small>
+          {question.sourceSolution ? (
+            <div className="worked-solution">
+              <strong>Worked solution from the PDF</strong>
+              <p>
+                <RichText text={question.sourceSolution.text} />
+              </p>
+              <small>
+                {question.sourceSolution.pages.length === 1 ? 'Page' : 'Pages'}{' '}
+                {question.sourceSolution.pages.join(', ')}
+              </small>
+            </div>
+          ) : (
+            question.explanation && (
+              <p>
+                <RichText text={question.explanation} />
+              </p>
+            )
+          )}
+          {!question.sourceSolution && (
+            <small>
+              {question.answerOrigin === 'ai'
+                ? 'AI-generated answer, grounded in the source'
+                : 'Answer supplied by the PDF'}{' '}
+              · Page {question.page}
+            </small>
+          )}
         </div>
       )}
     </>

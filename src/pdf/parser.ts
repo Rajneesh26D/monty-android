@@ -24,7 +24,7 @@ const tidy = (s: string) =>
     .replace(/\(\s+/g, '(')
     .trim();
 const noise = /aman\s*sir\s*english|SYN\s*\/\s*ANT\s*LECTURE/i;
-export function linesOf(items: TextItem[]): string[] {
+export function positionedLines(items: TextItem[]) {
   const groups: { y: number; items: TextItem[] }[] = [];
   for (const it of [...items].sort((a, b) => a.y - b.y || a.x - b.x)) {
     if (!it.text.trim() || noise.test(it.text)) continue;
@@ -52,9 +52,12 @@ export function linesOf(items: TextItem[]): string[] {
         result += it.text;
         end = it.x + it.width;
       }
-      return tidy(result);
+      return { text: tidy(result), y: g.y, items: g.items };
     })
-    .filter(Boolean);
+    .filter((line) => line.text);
+}
+export function linesOf(items: TextItem[]): string[] {
+  return positionedLines(items).map((line) => line.text);
 }
 export function splitMeaning(text: string): { meaningEn: string; meaningHi: string } {
   const hindi: string[] = [];

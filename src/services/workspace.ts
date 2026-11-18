@@ -21,6 +21,7 @@ import {
   mathItemsV3,
   MATH_LAYOUT_VERSION,
 } from '../pdf/content';
+import { workedQuestions } from '../pdf/workedQuestions';
 import { QuestionParser } from '../pdf/questions';
 import { repairMathBank } from '../core/repairMathBank';
 import { extractGeneral } from './api';
@@ -237,24 +238,43 @@ async function processPractice(
     }
     let bank: Bank;
     if (folder.area === 'maths') {
-      const normal = math.finish(bankId),
-        generic = sourceQuestions.finish(bankId);
+      const normal = math.finish(bankId);
+      const generic = sourceQuestions.finish(bankId);
       const useGeneric = generic.questions.length > normal.questions.length;
-      bank = useGeneric
-        ? { ...generic, kind: 'maths', mathLayoutVersion: MATH_LAYOUT_VERSION }
-        : normal;
-      if (!bank.questions.length && !sourceQuestions.hasChoices() && !math.sourceAnswers().length)
+      const worked = await workedQuestions(pages, bankId, async (number) => {
+        if (signal?.aborted) throw new Error('Import paused. The original PDF is saved.');
+        progress(`Reading marked answers · page ${number} of ${pdf!.count}`, 55);
+        return pdf!.graphics(number);
+      });
+      const parsedCount = Math.max(normal.questions.length, generic.questions.length);
+      const useWorked = worked && worked.bank.questions.length >= parsedCount;
+      bank = useWorked
+        ? { ...worked.bank, mathLayoutVersion: MATH_LAYOUT_VERSION }
+        : useGeneric
+          ? { ...generic, kind: 'maths', mathLayoutVersion: MATH_LAYOUT_VERSION }
+          : normal;
+      if (
+        !useWorked &&
+        !bank.questions.length &&
+        !sourceQuestions.hasChoices() &&
+        !math.sourceAnswers().length
+      )
         bank = await generalBank(pages, folder.area, bankId, id, pdf, progress, signal);
       else if (bank.warnings.length)
         bank = await recoverMaths(
           bank,
-          useGeneric ? sourceQuestions.sourceAnswers() : math.sourceAnswers(),
+          useWorked ? [] : useGeneric ? sourceQuestions.sourceAnswers() : math.sourceAnswers(),
           id,
           pdf,
           progress,
           signal,
           {
-            fragments: useGeneric ? sourceQuestions.recoveryFragments() : undefined,
+            fragments: useWorked
+              ? worked.fragments
+              : useGeneric
+                ? sourceQuestions.recoveryFragments()
+                : undefined,
+            solutions: useWorked ? worked.solutions : undefined,
             area: folder.area,
             onCheckpoint: async (partial) => {
               await saveBank(partial);
@@ -460,6 +480,7 @@ async function generalBank(
         answerOrigin: q.generated ? 'ai' : 'pdf',
         evidence: q.evidence,
         explanation: q.explanation,
+        sourceSolution: q.sourceSolution,
       });
     }
   }

@@ -1,5 +1,5 @@
 {
-  "versionCode": 20119,
-  "versionName": "2.1.19",
-  "notes": "Make selected Synonym and Antonym choices unmistakable with a blue fill and checkmark in every theme."
+  "versionCode": 20120,
+  "versionName": "2.1.20",
+  "notes": "Import highlighted maths answers and retain printed worked solutions across PDF pages. Show PDF illustrations on Synonym and Antonym study cards. Selected answers retain the blue fill and checkmark."
 }

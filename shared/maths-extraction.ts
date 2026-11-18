@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { sourceSolutionSchema } from './monty';
 export const mathsRequestSchema = z.object({
   area: z.enum(['maths', 'grammar', 'reading', 'vocab']),
   task: z.literal('recover-questions').optional(),
@@ -45,6 +46,7 @@ export const mathsOutputSchema = z.object({
         page: z.number().int().positive(),
         evidence: z.string().min(12).max(4000),
         explanation: z.string().max(4000).default(''),
+        sourceSolution: sourceSolutionSchema.optional(),
         answerOrigin: z.enum(['pdf', 'ai']),
       }),
     )

@@ -1,9 +1,12 @@
+import { RichText } from './RichText';
 import type { StudyItem } from '../../shared/monty';
 export function StudyContent({ item }: { item: StudyItem }) {
   return (
     <>
       <h3>Meaning / study content</h3>
-      <p>{item.text}</p>
+      <p>
+        <RichText text={item.text} />
+      </p>
       {item.hindi && (
         <p className="hindi" lang="hi">
           {item.hindi}

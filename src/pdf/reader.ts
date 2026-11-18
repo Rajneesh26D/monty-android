@@ -1,5 +1,6 @@
 import * as pdfjs from 'pdfjs-dist/legacy/build/pdf.mjs';
 import PdfWorker from './worker?worker';
+import { pageGraphics, type Bounds } from './graphics';
 import { linesOf, type PageData, type TextItem } from './parser';
 export async function openPdf(data: Uint8Array) {
   const port = new PdfWorker();
@@ -62,17 +63,29 @@ export async function openPdf(data: Uint8Array) {
       }
       return pages;
     },
-    async image(number: number): Promise<string> {
+    async graphics(number: number) {
+      const page = await pdf.getPage(number);
+      try {
+        return pageGraphics(await page.getOperatorList(), page.getViewport({ scale: 1 }).transform);
+      } finally {
+        page.cleanup();
+      }
+    },
+    async image(number: number, bounds?: Bounds): Promise<string> {
       const page = await pdf.getPage(number),
         base = page.getViewport({ scale: 1 });
-      const viewport = page.getViewport({
-        scale: Math.min(2, 1600 / Math.max(base.width, base.height)),
-      });
+      const [x, y, right, bottom] = bounds ?? [0, 0, base.width, base.height];
+      const scale = Math.min(2, 1600 / Math.max(right - x, bottom - y));
+      const viewport = page.getViewport({ scale });
       const canvas = document.createElement('canvas');
-      canvas.width = Math.ceil(viewport.width);
-      canvas.height = Math.ceil(viewport.height);
+      canvas.width = Math.ceil((right - x) * scale);
+      canvas.height = Math.ceil((bottom - y) * scale);
       try {
-        await page.render({ canvas, viewport }).promise;
+        await page.render({
+          canvas,
+          viewport,
+          transform: bounds ? [1, 0, 0, 1, -x * scale, -y * scale] : undefined,
+        }).promise;
         return canvas.toDataURL('image/jpeg', 0.83);
       } finally {
         page.cleanup();

@@ -26,6 +26,7 @@ export async function recoverMaths(
       context: string;
       text: string;
     }[];
+    solutions?: Map<number, NonNullable<MCQ['sourceSolution']>>;
     onCheckpoint?: (bank: Bank) => Promise<void>;
   } = {},
 ): Promise<Bank> {
@@ -77,6 +78,7 @@ export async function recoverMaths(
         answerOrigin: q.answerOrigin,
         evidence: q.evidence,
         explanation: q.explanation,
+        sourceSolution: options.solutions?.get(q.number) ?? q.sourceSolution,
       });
     }
   };
@@ -100,23 +102,24 @@ export async function recoverMaths(
     const group: PageData[] = [];
     for (let k = Math.max(1, n - 1); k <= Math.min(pdf.count, n + 1); k++)
       group.push(k === n ? page : await pageAt(k));
-    const pages = await Promise.all(
-      group.map(async (p) => {
-        const items = mathItems(p.items);
-        return {
-          number: p.number,
-          text: readingText({ ...p, items, text: linesOf(items).join('\n') }).slice(0, 40000),
-          ...(p.text.trim().length < 50 ||
-          p.hasVisualContent ||
-          /[\uFFFD\uE000-\uF8FF]/.test(p.text)
-            ? { image: await pdf.image(p.number) }
-            : {}),
-        };
-      }),
-    );
+    const sourcePages = () =>
+      Promise.all(
+        group.map(async (p) => {
+          const items = mathItems(p.items);
+          return {
+            number: p.number,
+            text: readingText({ ...p, items, text: linesOf(items).join('\n') }).slice(0, 40000),
+            ...(p.text.trim().length < 50 ||
+            p.hasVisualContent ||
+            /[\uFFFD\uE000-\uF8FF]/.test(p.text)
+              ? { image: await pdf.image(p.number) }
+              : {}),
+          };
+        }),
+      );
     for (let offset = 0; offset < Math.max(1, pageTargets.length); offset += 6) {
       const selected = pageTargets.slice(offset, offset + 6);
-      const key = `question-recovery-v2-${MATH_LAYOUT_VERSION}-${sourceId}-${n}-${selected.join('-') || 'all'}`;
+      const key = `question-recovery-v${options.solutions ? 3 : 2}-${MATH_LAYOUT_VERSION}-${sourceId}-${n}-${selected.join('-') || 'all'}`;
       let saved = await readJob<MathsOutput>(key);
       if (saved) append(saved);
       const pending = () => selected.filter((number) => !complete(number));
@@ -131,7 +134,7 @@ export async function recoverMaths(
           );
           const previous = collected.size;
           const fragments = options.fragments?.filter((f) => wanted.includes(f.number));
-          let selectedPages = pages;
+          let selectedPages;
           if (
             wanted.length &&
             fragments?.length &&
@@ -149,6 +152,7 @@ export async function recoverMaths(
               };
             });
           }
+          selectedPages ??= await sourcePages();
           const result = await extractMaths(
             {
               area: options.area ?? 'maths',
