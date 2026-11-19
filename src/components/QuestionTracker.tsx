@@ -5,6 +5,7 @@ import { questionProgress } from '../core/questionProgress';
 
 export function QuestionTracker({
   ids,
+  questionLabels,
   index,
   answered,
   visited,
@@ -14,6 +15,7 @@ export function QuestionTracker({
   study = false,
 }: {
   ids: string[];
+  questionLabels?: string[];
   index: number;
   answered: (id: string) => boolean;
   visited?: string[];
@@ -23,6 +25,8 @@ export function QuestionTracker({
   study?: boolean;
 }) {
   const items = questionProgress(ids, answered, visited, marked, ids[index]);
+  const labelAt = (position: number) => questionLabels?.[position] ?? String(position + 1);
+  const totalLabel = questionLabels ? '' : ` of ${ids.length}`;
   const count = items.filter((q) => q.answered).length;
   const panelId = useId();
   const panel = useRef<HTMLDialogElement>(null);
@@ -48,11 +52,11 @@ export function QuestionTracker({
         >
           {items.map((q, i) => (
             <option key={q.id} value={i}>
-              {i + 1}
+              {labelAt(i)}
             </option>
           ))}
-        </select>{' '}
-        of {ids.length}
+        </select>
+        {totalLabel}
       </label>
     </div>
   );
@@ -106,7 +110,8 @@ export function QuestionTracker({
             <h2 id={panelId + '-title'}>Question palette</h2>
             <p>
               {study ? 'Study' : practice ? 'Practice' : 'Quiz'} · {study ? 'Card' : 'Question'}{' '}
-              {index + 1} of {ids.length}
+              {labelAt(index)}
+              {totalLabel}
             </p>
           </div>
           <button
@@ -164,11 +169,11 @@ export function QuestionTracker({
                   (q.answered ? 'answered' : q.visited ? 'unanswered' : 'unvisited') +
                   (q.marked ? ' marked' : '')
                 }
-                aria-label={`Question ${i + 1}, ${q.answered ? (study ? 'viewed' : 'answered') : q.visited ? 'not answered' : 'not visited'}${q.marked ? ', marked for review' : ''}`}
+                aria-label={`Question ${labelAt(i)}, ${q.answered ? (study ? 'viewed' : 'answered') : q.visited ? 'not answered' : 'not visited'}${q.marked ? ', marked for review' : ''}`}
                 aria-current={i === index ? 'step' : undefined}
                 onClick={() => jump(i)}
               >
-                {i + 1}
+                {labelAt(i)}
                 {q.marked && <Flag size={10} />}
                 {q.marked && q.answered && <Check size={10} className="palette-answered" />}
               </button>

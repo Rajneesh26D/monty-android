@@ -971,6 +971,12 @@ function PracticeQuestions({
       },
     }));
   if (!q) return <p>No ready questions. Review this PDF first.</p>;
+  const questionLabels =
+    bank.kind === 'maths'
+      ? bank.questions.map(({ number, sourcePart }) =>
+          sourcePart ? `${number} (${sourcePart})` : String(number),
+        )
+      : undefined;
   const move = (next: number) => {
     setIndex(next);
     void update({ index: next, visited: [...new Set([...visited, bank.questions[next].id])] });
@@ -981,6 +987,7 @@ function PracticeQuestions({
       <QuestionTracker
         practice
         ids={bank.questions.map((q) => q.id)}
+        questionLabels={questionLabels}
         index={index}
         answered={(id) =>
           bank.questions
@@ -1002,6 +1009,7 @@ function PracticeQuestions({
       </div>
       <MCQView
         maths={bank.kind === 'maths'}
+        questionLabel={questionLabels?.[index]}
         sourceAttachmentId={attachment.id}
         question={q}
         selected={progress.answers[q.id]}

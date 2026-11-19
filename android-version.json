@@ -1,5 +1,5 @@
 {
-  "versionCode": 20122,
-  "versionName": "2.1.22",
-  "notes": "Show original cropped maths solutions with their printed spacing and columns, plus a larger view. Keep vocabulary illustrations tied to the saved source PDF."
+  "versionCode": 20123,
+  "versionName": "2.1.23",
+  "notes": "Show the PDF's question numbers on maths practice questions and in the palette, including gaps and subparts."
 }

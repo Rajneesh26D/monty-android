@@ -5,6 +5,7 @@ import { WorkedSolution } from './WorkedSolution';
 import { RichText } from './RichText';
 export function MCQView({
   question,
+  questionLabel,
   selected,
   onSelect,
   reveal = false,
@@ -14,6 +15,7 @@ export function MCQView({
   sourceAttachmentId,
 }: {
   question: MCQ;
+  questionLabel?: string;
   selected?: string;
   onSelect?: (id: string) => void;
   reveal?: boolean;
@@ -65,6 +67,7 @@ export function MCQView({
             Sheet question {question.number} · page {question.page}
           </p>
         )}
+        {questionLabel && <div className="practice-question-number">Question {questionLabel}</div>}
         <h2 className="question-stem">
           <RichText text={display(question.stem)} />
         </h2>

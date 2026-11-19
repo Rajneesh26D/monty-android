@@ -173,6 +173,11 @@ h3,
 .practice-reader .quiz-head {
   padding-right: 44px;
 }
+.practice-question-number {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+}
 .practice-reader .question-stem {
   font-family: inherit !important;
   font-size: 18px !important;

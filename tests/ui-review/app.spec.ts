@@ -27,7 +27,7 @@ const bank = bankSchema.parse({
   questions: [
     {
       id: 'qa-q1',
-      number: 1,
+      number: 63,
       stem: 'Which number is the largest?',
       options: [
         { id: 'a', label: 'A', text: '15' },
@@ -39,6 +39,19 @@ const bank = bankSchema.parse({
       page: 1,
       origin: 'pdf',
       explanation: '30 is greater than the other numbers.',
+    },
+    {
+      id: 'qa-q2',
+      number: 65,
+      sourcePart: 'ii',
+      stem: 'Which number is the smallest?',
+      options: [
+        { id: 'a', label: 'A', text: '15' },
+        { id: 'b', label: 'B', text: '20' },
+      ],
+      answerId: 'a',
+      page: 1,
+      origin: 'pdf',
     },
   ],
   study: [
@@ -137,7 +150,7 @@ async function prepare(
     createdAt: 1,
     size: 100,
     pinned: false,
-    count: 1,
+    count: bank.questions.length,
     status: 'ready',
     bankId: 'qa-bank',
   };
@@ -153,7 +166,12 @@ async function prepare(
     selectionNumbers: [1],
     durationMinutes: 15,
   };
-  state.monty!.banks['qa-bank'] = { id: 'qa-bank', kind: 'maths', count: 1, studyCount: 1 };
+  state.monty!.banks['qa-bank'] = {
+    id: 'qa-bank',
+    kind: 'maths',
+    count: bank.questions.length,
+    studyCount: 1,
+  };
   await page.evaluate(
     async ({ state, bank }) => {
       const open = (name: string, stores: string[]) =>
@@ -400,6 +418,32 @@ test('red and AMOLED presets stay selected across navigation and reload', async 
   await expect(page.locator('html')).toHaveAttribute('data-mode', 'dark');
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'amoled');
   await review(page, info, 'amoled-appearance');
+});
+
+test('maths practice shows PDF question numbers across gaps and subparts', async ({ page }) => {
+  await prepare(page, { mode: 'dark', color: 'red' });
+  await page.getByRole('button', { name: 'Maths', exact: false }).first().click();
+  await page.getByRole('button', { name: /^QA Maths/ }).click();
+  await page.locator('.folder-nav').getByRole('button', { name: 'Practice', exact: true }).click();
+  await page
+    .locator('.document-card')
+    .filter({ hasText: 'Number practice' })
+    .getByRole('button', { name: 'Practice', exact: true })
+    .click();
+  await expect(page.getByText('Question 63', { exact: true })).toBeVisible();
+  const paletteButton = page.getByRole('button', { name: 'Palette', exact: true });
+  await paletteButton.click();
+  const palette = page.getByRole('dialog', { name: 'Question palette' });
+  await expect(palette.getByText('Practice · Question 63', { exact: true })).toBeVisible();
+  await expect(palette.getByRole('button', { name: /^Question 64,/ })).toHaveCount(0);
+  await palette.getByRole('button', { name: 'Question 65 (ii), not visited' }).click();
+  await expect(page.getByText('Question 65 (ii)', { exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Which number is the smallest?' })).toBeVisible();
+  await paletteButton.click();
+  await expect(palette.getByRole('button', { name: /^Question 65 \(ii\),/ })).toHaveAttribute(
+    'aria-current',
+    'step',
+  );
 });
 
 test('a newly saved maths quiz starts immediately and accepts an answer', async ({ page }) => {
