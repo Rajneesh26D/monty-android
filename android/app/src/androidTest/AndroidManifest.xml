@@ -6,7 +6,8 @@
                 <action android:name="android.intent.action.VIEW" />
                 <action android:name="android.intent.action.INSTALL_PACKAGE" />
                 <category android:name="android.intent.category.DEFAULT" />
-                <data android:scheme="content" android:mimeType="application/vnd.android.package-archive" />
+                <data android:scheme="content" android:host="com.monty.study.fileprovider"
+                      android:mimeType="application/vnd.android.package-archive" />
             </intent-filter>
         </activity>
     </application>

@@ -14,9 +14,7 @@ download="Monty-${monty_version}-universal.apk"
 adb shell mkdir -p /sdcard/Download
 adb push "release/$download" "/sdcard/Download/$download"
 adb shell am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d "file:///sdcard/Download/$download"
-adb shell pm disable --user 0 com.monty.study.test/android.app.Activity
 python3 scripts/install-downloaded-apk.py "$download" "$(node -p 'require("./android-version.json").versionCode')"
-adb shell pm enable --user 0 com.monty.study.test/android.app.Activity
 adb shell am instrument -w -e class 'com.monty.study.UpgradeDataTest#verify' com.monty.study.test/androidx.test.runner.AndroidJUnitRunner | tee "$RUNNER_TEMP/upgrade-verify.txt"
 grep -q 'OK (1 test)' "$RUNNER_TEMP/upgrade-verify.txt"
 echo "Verified Android 16 update from the actual ${previous} APK through Downloads, without uninstalling and with private app data retained."
