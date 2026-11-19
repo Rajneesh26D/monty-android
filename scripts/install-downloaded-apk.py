@@ -23,16 +23,57 @@ def nodes():
         return []
 
 
+def tap(node):
+    left, top, right, bottom = map(int, re.findall(r'\d+', node.get('bounds', '')))
+    adb('shell', 'input', 'tap', str((left + right) // 2), str((top + bottom) // 2))
+
+
 def tap_when_visible(predicate, description):
     deadline = time.monotonic() + 35
+    visible = []
     while time.monotonic() < deadline:
-        for node in nodes():
+        visible = nodes() or visible
+        for node in visible:
             if predicate(node):
-                left, top, right, bottom = map(int, re.findall(r'\d+', node.get('bounds', '')))
-                adb('shell', 'input', 'tap', str((left + right) // 2), str((top + bottom) // 2))
+                tap(node)
                 return
         time.sleep(0.5)
-    raise RuntimeError(f'Android did not show {description}: ' + adb('shell', 'dumpsys', 'activity', 'top')[-5000:])
+    raise RuntimeError(f'Android did not show {description}: {labels(visible)}')
+
+
+def labels(elements):
+    return [node.get('text') or node.get('content-desc') for node in elements
+            if node.get('text') or node.get('content-desc')]
+
+
+def confirm_download_update():
+    deadline = time.monotonic() + 55
+    visible = []
+    while time.monotonic() < deadline:
+        visible = nodes() or visible
+        for node in visible:
+            if node.get('enabled') != 'true':
+                continue
+            package = node.get('package', '')
+            text = node.get('text', '').strip().lower()
+            if 'packageinstaller' in package or 'permissioncontroller' in package:
+                if text in ('update', 'update anyway', 'install'):
+                    print(f'Confirmed Android installer button: {text}', flush=True)
+                    tap(node)
+                    return
+                if text in ('continue', 'settings'):
+                    print(f'Android installer source approval: {text}', flush=True)
+                    tap(node)
+                    break
+            if package == 'com.android.settings' and node.get('checkable') == 'true' and node.get('checked') == 'false':
+                tap(node)
+                time.sleep(0.5)
+                if any(item.get('package') == package for item in nodes()):
+                    adb('shell', 'input', 'keyevent', 'KEYCODE_BACK')
+                break
+        time.sleep(0.5)
+    print(adb('logcat', '-d', '-s', 'PackageInstaller', 'InstallStart', 'InstallStaging')[-3500:])
+    raise RuntimeError(f'Android did not show an enabled system Update button: {labels(visible)}')
 
 
 filename, expected = sys.argv[1], int(sys.argv[2])
@@ -45,11 +86,7 @@ downloads_package = resolved.split('/')[0]
 adb('shell', 'appops', 'set', downloads_package, 'REQUEST_INSTALL_PACKAGES', 'allow')
 adb('shell', 'am', 'start', '-W', '-a', action, '-n', resolved)
 tap_when_visible(lambda node: filename in (node.get('text'), node.get('content-desc')), filename)
-tap_when_visible(
-    lambda node: node.get('text', '').lower() == 'update'
-    and ('packageinstaller' in node.get('package', '') or 'permissioncontroller' in node.get('package', '')),
-    'the system Update button',
-)
+confirm_download_update()
 deadline = time.monotonic() + 45
 while time.monotonic() < deadline:
     if package_code() == expected:
