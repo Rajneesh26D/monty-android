@@ -446,6 +446,51 @@ test('maths practice shows PDF question numbers across gaps and subparts', async
   );
 });
 
+test('saved PDF notes open inside Monty and download only on request', async ({ page }) => {
+  const objects = [
+    '<< /Type /Catalog /Pages 2 0 R >>',
+    '<< /Type /Pages /Kids [3 0 R 4 0 R] /Count 2 >>',
+    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 300 400] /Contents 5 0 R >>',
+    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 300 400] /Contents 5 0 R >>',
+    '<< /Length 28 >>\nstream\n0 0 1 rg 50 50 100 100 re f\nendstream',
+  ];
+  let source = '%PDF-1.4\n';
+  const offsets = objects.map((object, i) => {
+    const offset = source.length;
+    source += `${i + 1} 0 obj\n${object}\nendobj\n`;
+    return offset;
+  });
+  const xref = source.length;
+  source +=
+    'xref\n0 6\n0000000000 65535 f \n' +
+    offsets.map((n) => `${String(n).padStart(10, '0')} 00000 n \n`).join('');
+  source += `trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`;
+  await prepare(page, { mode: 'light', color: 'red' });
+  await page.getByRole('button', { name: 'Maths', exact: false }).first().click();
+  await page.getByRole('button', { name: /^QA Maths/ }).click();
+  await page.getByRole('button', { name: 'Notes', exact: true }).click();
+  await page.locator('input[type=file]').setInputFiles({
+    name: 'Study note.pdf',
+    mimeType: 'application/pdf',
+    buffer: Buffer.from(source),
+  });
+  let downloads = 0;
+  page.on('download', () => downloads++);
+  const note = page.getByRole('button', { name: /^Study note.pdf/ });
+  await note.click();
+  const viewer = page.getByRole('dialog', { name: 'Study note.pdf' });
+  await expect(viewer.getByRole('img', { name: 'PDF page 1' })).toBeVisible();
+  await viewer.getByRole('button', { name: 'Next PDF page' }).click();
+  await expect(viewer.getByRole('img', { name: 'PDF page 2' })).toBeVisible();
+  await viewer.getByLabel('PDF zoom').selectOption('150');
+  expect(downloads).toBe(0);
+  const downloaded = page.waitForEvent('download');
+  await viewer.getByRole('button', { name: 'Download file' }).click();
+  expect((await downloaded).suggestedFilename()).toBe('Study note.pdf');
+  await viewer.getByRole('button', { name: 'Close viewer' }).click();
+  await expect(note).toBeFocused();
+});
+
 test('a newly saved maths quiz starts immediately and accepts an answer', async ({ page }) => {
   await prepare(page, { mode: 'dark', color: 'red' });
   await page.getByRole('button', { name: 'Maths', exact: false }).first().click();

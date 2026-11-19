@@ -30,7 +30,7 @@ import { addPractice, importPractice, readBank, saveBank } from '../services/wor
 import { removeAttachment } from '../storage/repository';
 import { startExam, time, createExamSet } from '../core/exams';
 import { NotesPanel } from './NotesPanel';
-import { openPdfInApp } from '../services/openPdf';
+import { usePdfViewer } from './FileViewer';
 import { MCQView } from './MCQView';
 import { ExamScreen, ExamAnalysis } from './ExamScreen';
 import { SavedQuestions, questionRef } from './SavedQuestions';
@@ -57,6 +57,7 @@ export function StudyFolder({
   onHome: () => void;
 }) {
   const { chooseSetup, timerDialog } = useTestSetup();
+  const { openPdf, pdfViewer } = usePdfViewer(notify);
   const [customization, setCustomization] = useState<QuizCustomization>(defaultQuizCustomization);
   const [questionSelection, setQuestionSelection] = useState('');
   const [tab, setTab] = useState<Tab>('practice'),
@@ -528,6 +529,7 @@ export function StudyFolder({
   return (
     <>
       {timerDialog}
+      {pdfViewer}
       <div className="folder-toolbar">
         <button className="back-button" onClick={onBack}>
           <ArrowLeft size={17} /> Folders
@@ -730,7 +732,7 @@ export function StudyFolder({
                           Practice
                         </button>
                       )}
-                      <button className="secondary" onClick={() => void openPdfInApp(file, notify)}>
+                      <button className="secondary" onClick={() => openPdf(file)}>
                         Open PDF
                       </button>
                       {file.bankId && (

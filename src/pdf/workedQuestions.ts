@@ -10,6 +10,80 @@ const solution = /^(?:worked\s+solution|solution|sol\.)\s*(?:[:.−–—-]\s*|$
 const label = /(?:^|\s)(?:\(([A-H])\)|([A-H])[)\.])\s*/gi;
 const clean = (text: string) => text.replace(/[\u0000]/g, '').trim();
 const idOf = (m: RegExpMatchArray) => (m[1] || m[2]).toUpperCase();
+const equation = /[=≈].*[\p{L}\p{N}]/u;
+
+// Some worksheets start the calculation beside the final choice, then print
+// the solution label on the next line. Keep the original text coordinates
+// until the last choice and the calculation have been separated.
+function openingSteps(row: Row) {
+  const marker = row.solution[0];
+  if (!marker) return { question: row.question, steps: [] as Line[] };
+  let at = row.question.length - 1;
+  for (; at >= 0; at--) {
+    const line = row.question[at];
+    const first = [...line.text.matchAll(label)][0];
+    if (first?.index === 0 && line.page === marker.page) break;
+  }
+  const choices = row.question[at];
+  if (!choices || marker.y - choices.y > 3 * (choices.items[0]?.height || 12))
+    return { question: row.question, steps: [] as Line[] };
+
+  const firstStep = (candidate: Line, optionText: string, right: number, font?: string) => {
+    const first = candidate.items[0];
+    const lastLabel = [...optionText.matchAll(label)].at(-1);
+    if (
+      !first ||
+      !lastLabel ||
+      !optionText.slice(lastLabel.index! + lastLabel[0].length).trim() ||
+      [...candidate.text.matchAll(label)].length
+    )
+      return false;
+    const height = first.height || 12;
+    if (first.x - right < 1.5 * height || !equation.test(candidate.text)) return false;
+    return (
+      (!!first.fontName && !!font && first.fontName !== font) ||
+      row.solution.some(
+        (line) =>
+          line.page === candidate.page &&
+          line.items.some((item) => Math.abs(item.x - first.x) <= height * 0.6),
+      )
+    );
+  };
+  const rightEdge = (items: Line['items']) => Math.max(...items.map((i) => i.x + i.width));
+  const following = row.question.slice(at + 1);
+  const lastItem = choices.items.at(-1);
+  if (
+    following.length &&
+    lastItem &&
+    following.every((line) => line.page === marker.page && equation.test(line.text)) &&
+    firstStep(following[0], choices.text, rightEdge(choices.items), lastItem.fontName)
+  )
+    return { question: row.question.slice(0, at + 1), steps: following };
+  if (!following.length) {
+    for (let i = 1; i < choices.items.length; i++) {
+      const left = choices.items.slice(0, i),
+        right = choices.items.slice(i);
+      const [optionLine] = positionedLines(left),
+        [stepLine] = positionedLines(right);
+      if (
+        optionLine &&
+        stepLine &&
+        firstStep(
+          { ...stepLine, page: choices.page },
+          optionLine.text,
+          rightEdge(left),
+          left.at(-1)?.fontName,
+        )
+      ) {
+        return {
+          question: [...row.question.slice(0, at), { ...optionLine, page: choices.page }],
+          steps: [{ ...stepLine, page: choices.page }],
+        };
+      }
+    }
+  }
+  return { question: row.question, steps: [] as Line[] };
+}
 
 function choicesOf(lines: Line[]) {
   const options: { id: string; label: string; text: string }[] = [];
@@ -151,27 +225,90 @@ function workedRows(pages: PageData[]): Row[] {
 export type SolutionRegion = { page: number; bounds: Bounds };
 export type SolutionRegionIndex = Record<string, SolutionRegion[]>;
 
+function sourceSolutionOf(lines: Line[]): MCQ['sourceSolution'] {
+  const source = lines.filter((line) => clean(line.text));
+  const text = source
+    .map((line) => clean(line.text))
+    .join('\n')
+    .slice(0, 18000);
+  return text ? { text, pages: [...new Set(source.map((line) => line.page))] } : undefined;
+}
+
+export function repairWorkedChoices(bank: Bank, pages: PageData[]): Bank {
+  const fixes = new Map<
+    string,
+    {
+      before: ReturnType<typeof choicesOf>;
+      after: ReturnType<typeof choicesOf>;
+      previousSolution: MCQ['sourceSolution'];
+      solution: MCQ['sourceSolution'];
+    }
+  >();
+  for (const row of workedRows(pages)) {
+    const { question, steps } = openingSteps(row);
+    if (!steps.length) continue;
+    const before = choicesOf(row.question),
+      after = choicesOf(question);
+    if (!before.options.length || before.options.length !== after.options.length) continue;
+    fixes.set(`${row.page}-${row.number}`, {
+      before,
+      after,
+      previousSolution: sourceSolutionOf([...before.earlierSteps, ...row.solution]),
+      solution: sourceSolutionOf([...after.earlierSteps, ...steps, ...row.solution]),
+    });
+  }
+  return {
+    ...bank,
+    questions: bank.questions.map((question) => {
+      const fix = fixes.get(`${question.page}-${question.number}`);
+      if (!fix || question.sourcePart || question.options.length !== fix.after.options.length)
+        return question;
+      let changed = false;
+      const options = question.options.map((option, i) => {
+        const before = fix.before.options[i],
+          after = fix.after.options[i];
+        if (option.id !== before.id || option.text !== before.text || option.text === after.text)
+          return option;
+        changed = true;
+        return { ...option, text: after.text };
+      });
+      if (!changed) return question;
+      const sourceSolution =
+        !question.sourceSolution || question.sourceSolution.text === fix.previousSolution?.text
+          ? fix.solution
+          : question.sourceSolution;
+      return { ...question, options, sourceSolution };
+    }),
+  };
+}
+
 export function workedSolutionRegions(pages: PageData[]): SolutionRegionIndex {
   const regions: SolutionRegionIndex = {};
   const pageByNumber = new Map(pages.map((page) => [page.number, page]));
   for (const row of workedRows(pages)) {
     if (!row.worked) continue;
+    const { question, steps } = openingSteps(row);
     const byPage = new Map<number, typeof row.solution>();
-    for (const line of [...choicesOf(row.question).earlierSteps, ...row.solution]) {
+    for (const line of [...choicesOf(question).earlierSteps, ...row.solution]) {
       const group = byPage.get(line.page) ?? [];
       group.push(line);
       byPage.set(line.page, group);
     }
-    regions[`${row.page}-${row.number}`] = Array.from(byPage).flatMap(([number, lines]) => {
+    const groups: [number, Line[]][] = steps.length
+      ? [[steps[0].page, steps], ...byPage]
+      : [...byPage];
+    regions[`${row.page}-${row.number}`] = groups.flatMap(([number, lines]) => {
       const page = pageByNumber.get(number)!;
       const items = lines.flatMap((line) => line.items).filter((item) => item.text.trim());
       if (!items.length) return [];
       const firstBaseline = Math.min(...lines.map((line) => line.y));
       const previousBaseline = Math.max(
         0,
-        ...row.question
-          .filter((line) => line.page === number && line.y < firstBaseline - 3)
-          .map((line) => line.y + 2),
+        ...(lines === steps
+          ? []
+          : [...question, ...steps]
+              .filter((line) => line.page === number && line.y < firstBaseline - 3)
+              .map((line) => line.y + 2)),
       );
       const bounds: Bounds = [
         Math.max(0, Math.min(...items.map((item) => item.x)) - 7),
@@ -205,7 +342,13 @@ export async function workedQuestions(
   | undefined
 > {
   const rows = workedRows(pages);
-  const parsed = rows.map((row) => ({ row, ...choicesOf(row.question) }));
+  const parsed = rows.map((row) => {
+    const { question, steps } = openingSteps(row);
+    return {
+      row: { ...row, question, solution: [...steps, ...row.solution] },
+      ...choicesOf(question),
+    };
+  });
   if (!parsed.some(({ options, row }) => options.length && row.worked)) return;
   const graphics = new Map<number, Graphics>();
   const optionPages = new Set(
@@ -223,12 +366,8 @@ export async function workedQuestions(
   const solutions = new Map<number, NonNullable<MCQ['sourceSolution']>>();
   for (const [i, { row, stem, options, earlierSteps }] of parsed.entries()) {
     const pageNumbers = [...new Set([...row.question, ...row.solution].map((line) => line.page))];
-    const source = [...earlierSteps, ...row.solution].filter((line) => clean(line.text));
-    const text = source
-      .map((line) => clean(line.text))
-      .join('\n')
-      .slice(0, 18000);
-    const sourceSolution = text && { text, pages: [...new Set(source.map((line) => line.page))] };
+    const sourceSolution = sourceSolutionOf([...earlierSteps, ...row.solution]);
+    const text = sourceSolution?.text ?? '';
     if (sourceSolution) solutions.set(row.number, sourceSolution);
     fragments.push({
       number: row.number,

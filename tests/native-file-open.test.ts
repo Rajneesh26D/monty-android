@@ -29,7 +29,7 @@ vi.mock('../src/storage/repository', () => ({
   readPdf: mocks.read,
   download: mocks.download,
 }));
-import { openPdfInApp, openImageInApp } from '../src/services/openPdf';
+import { openNativePdf, openImageInApp } from '../src/services/openPdf';
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.cache.mockResolvedValue({ opened: false });
@@ -43,7 +43,7 @@ beforeEach(() => {
 });
 it('reopens a native cached PDF without reading or copying any original bytes', async () => {
   mocks.cache.mockResolvedValue({ opened: true });
-  await openPdfInApp({ id: 'pdf', name: 'Notes' }, vi.fn());
+  await openNativePdf({ id: 'pdf', name: 'Notes' }, vi.fn());
   expect(mocks.local).not.toHaveBeenCalled();
   expect(mocks.begin).not.toHaveBeenCalled();
   expect(mocks.read).not.toHaveBeenCalled();
@@ -52,7 +52,7 @@ it('transfers local blobs in bounded chunks without materializing the whole file
   const blob = new Blob([new Uint8Array(1300000).fill(7)]);
   vi.spyOn(blob, 'arrayBuffer').mockRejectedValue(new Error('Whole-file reads forbidden'));
   mocks.local.mockResolvedValue(blob);
-  await openPdfInApp({ id: 'pdf', name: 'Notes' }, vi.fn());
+  await openNativePdf({ id: 'pdf', name: 'Notes' }, vi.fn());
   expect(mocks.append).toHaveBeenCalledTimes(3);
   expect(mocks.append.mock.calls.every(([o]) => o.data.length <= 700000)).toBe(true);
   expect(mocks.append.mock.calls.reduce((n, [o]) => n + atob(o.data).length, 0)).toBe(blob.size);
@@ -62,7 +62,7 @@ it('transfers local blobs in bounded chunks without materializing the whole file
 });
 it('streams uncached remote files through the native authenticated downloader', async () => {
   mocks.local.mockResolvedValue(null);
-  await openPdfInApp({ id: 'pdf', name: 'Notes' }, vi.fn());
+  await openNativePdf({ id: 'pdf', name: 'Notes' }, vi.fn());
   expect(mocks.remote).toHaveBeenCalledWith(
     expect.objectContaining({ id: 'pdf', mime: 'application/pdf', token: 'a'.repeat(64) }),
   );
@@ -75,7 +75,7 @@ it('opens images through the same cache and bounded transfer path', async () => 
 it('cleans up incomplete copies and reports errors without sharing', async () => {
   mocks.append.mockRejectedValue(new Error('Storage unavailable'));
   const notify = vi.fn();
-  await openPdfInApp({ id: 'pdf', name: 'Notes' }, notify);
+  await openNativePdf({ id: 'pdf', name: 'Notes' }, notify);
   expect(mocks.cancel).toHaveBeenCalled();
   expect(mocks.finish).not.toHaveBeenCalled();
   expect(notify).toHaveBeenLastCalledWith('Storage unavailable');

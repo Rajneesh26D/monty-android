@@ -17,7 +17,7 @@ export async function workedSolutionImages(
     )?.id;
   }
   if (!attachmentId) return [];
-  const key = `worked-solution-regions-v1-${attachmentId}`;
+  const key = `worked-solution-regions-v2-${attachmentId}`;
   const file = await readAttachment(attachmentId);
   const pdf = await openPdf(file.bytes);
   try {

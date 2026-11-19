@@ -6,7 +6,7 @@ import type { Commit } from '../services/importer';
 import { addNote } from '../services/workspace';
 import { removeAttachment } from '../storage/repository';
 import { FileViewer } from './FileViewer';
-import { isPdf, openPdfInApp, openImageInApp } from '../services/openPdf';
+import { isPdf, openNativePdf, openImageInApp } from '../services/openPdf';
 export function NotesPanel({
   folderId,
   state,
@@ -68,7 +68,8 @@ export function NotesPanel({
             <button
               className="file-open"
               onClick={() => {
-                if (isPdf(n.name, n.mime)) void openPdfInApp(n, notify);
+                if (Capacitor.isNativePlatform() && isPdf(n.name, n.mime))
+                  void openNativePdf(n, notify);
                 else if (
                   Capacitor.isNativePlatform() &&
                   (n.mime.startsWith('image/') ||
@@ -153,6 +154,7 @@ export function NotesPanel({
       </div>
       {note && (
         <FileViewer
+          key={note.id}
           id={note.id}
           name={note.name}
           mime={note.mime}

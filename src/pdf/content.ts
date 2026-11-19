@@ -2,7 +2,7 @@ import type { PageData, TextItem } from './parser';
 import { linesOf } from './parser';
 import type { Bank, MCQ, StudyItem } from '../../shared/monty';
 const clean = (s: string) => s.replace(/\s+/g, ' ').trim();
-export const MATH_LAYOUT_VERSION = 4;
+export const MATH_LAYOUT_VERSION = 5;
 
 // Retained only to recognize untouched text in banks imported before this fix.
 export const legacyMathItems = (items: TextItem[]) => groupMathItems(items, /^[\dxyz+−-]+$/);

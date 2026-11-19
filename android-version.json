@@ -1,5 +1,5 @@
 {
-  "versionCode": 20124,
-  "versionName": "2.1.24",
-  "notes": "Open Android's built-in package installer directly from Monty and verify downloaded APKs update the existing app in place."
+  "versionCode": 20125,
+  "versionName": "2.1.25",
+  "notes": "Keep worked maths calculations separate from choices and repair previously imported questions when their original PDF is available."
 }

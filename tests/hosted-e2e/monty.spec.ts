@@ -52,14 +52,17 @@ test('home, independent folders and notes upload/download/rename/pin persist', a
   page.once('dialog', (d) => d.accept('Revision notes'));
   await page.getByRole('button', { name: 'Rename idioms.pdf', exact: true }).click();
   await page.getByRole('button', { name: 'Pin Revision notes', exact: true }).click();
-  const downloaded = page.waitForEvent('download');
   await page.getByRole('button', { name: /^Revision notes/ }).click();
+  const viewer = page.getByRole('dialog', { name: 'Revision notes' });
+  await expect(viewer.getByRole('img', { name: 'PDF page 1' })).toBeVisible();
+  const downloaded = page.waitForEvent('download');
+  await viewer.getByRole('button', { name: 'Download file' }).click();
   const pdf = await downloaded;
   expect(pdf.suggestedFilename()).toBe('Revision notes.pdf');
   expect(
     (await readFile((await pdf.path())!)).equals(await readFile('tests/fixtures/idioms.pdf')),
   ).toBe(true);
-  await expect(page.locator('.viewer')).toHaveCount(0);
+  await viewer.getByRole('button', { name: 'Close viewer' }).click();
   await expect(page.getByText('Saved online', { exact: true })).toBeVisible();
   await page.reload();
   await expect(page.getByRole('heading', { name: 'What shall we study?' })).toBeVisible();
@@ -80,14 +83,17 @@ test('maths imports 100 source questions without AI, immediate feedback and isol
     return route.abort();
   });
   await uploadMaths(page);
-  const opened = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Open PDF', exact: true }).click();
+  const viewer = page.getByRole('dialog', { name: 'percentage.pdf' });
+  await expect(viewer.getByRole('img', { name: 'PDF page 1' })).toBeVisible();
+  const opened = page.waitForEvent('download');
+  await viewer.getByRole('button', { name: 'Download file' }).click();
   const pdf = await opened;
   expect(pdf.suggestedFilename()).toBe('percentage.pdf');
   expect(
     (await readFile((await pdf.path())!)).equals(await readFile('tests/fixtures/percentage.pdf')),
   ).toBe(true);
-  await expect(page.locator('.viewer')).toHaveCount(0);
+  await viewer.getByRole('button', { name: 'Close viewer' }).click();
   await page
     .locator('.document-card')
     .getByRole('button', { name: 'Practice', exact: true })
@@ -421,11 +427,14 @@ test('Anto/Syno and Idioms share paths, PDF actions and tab order; vocabulary ch
   expect(tabs).toEqual(['Notes', 'Practice', 'Quiz', 'Bookmarks', 'Results']);
   const actions = await page.locator('.document-actions').getByRole('button').allTextContents();
   expect(actions).toEqual(['Practice', 'Open PDF', 'Review / edit']);
-  const downloaded = page.waitForEvent('download');
   await page
     .locator('.document-card')
     .getByRole('button', { name: 'Open PDF', exact: true })
     .click();
+  const viewer = page.getByRole('dialog', { name: '4-LEC-2-CONCISE.pdf' });
+  await expect(viewer.getByRole('img', { name: 'PDF page 1' })).toBeVisible();
+  const downloaded = page.waitForEvent('download');
+  await viewer.getByRole('button', { name: 'Download file' }).click();
   const pdf = await downloaded;
   expect(pdf.suggestedFilename()).toBe('4-LEC-2-CONCISE.pdf');
   expect(
@@ -433,7 +442,7 @@ test('Anto/Syno and Idioms share paths, PDF actions and tab order; vocabulary ch
       await readFile('tests/fixtures/4-LEC-2-CONCISE.pdf'),
     ),
   ).toBe(true);
-  await expect(page.locator('.viewer')).toHaveCount(0);
+  await viewer.getByRole('button', { name: 'Close viewer' }).click();
   page.once('dialog', (d) => d.accept('Renamed vocabulary'));
   await page.getByRole('button', { name: /^Rename 4-LEC/ }).click();
   await page.getByRole('button', { name: 'Pin Renamed vocabulary', exact: true }).click();
@@ -501,12 +510,15 @@ test('55 MB notes upload, cloud download and restore in a fresh browser', async 
     const download = await fresh.request.get('http://127.0.0.1:5180/api/files/' + file.id);
     expect(download.ok()).toBe(true);
     expect((await download.body()).equals(bytes)).toBe(true);
-    const downloaded = fresh.waitForEvent('download');
     await fresh.getByRole('button', { name: /^large-notes.pdf/ }).click();
+    const viewer = fresh.getByRole('dialog', { name: 'large-notes.pdf' });
+    await expect(viewer.getByRole('img', { name: 'PDF page 1' })).toBeVisible({ timeout: 30000 });
+    const downloaded = fresh.waitForEvent('download');
+    await viewer.getByRole('button', { name: 'Download file' }).click();
     const pdfDownload = await downloaded;
     expect(pdfDownload.suggestedFilename()).toBe('large-notes.pdf');
     expect((await readFile((await pdfDownload.path())!)).equals(bytes)).toBe(true);
-    await expect(fresh.locator('.viewer')).toHaveCount(0);
+    await viewer.getByRole('button', { name: 'Close viewer' }).click();
   } finally {
     await context.close();
   }

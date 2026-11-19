@@ -49,7 +49,7 @@ import { presentQuestions } from './core/quizOrder';
 import type { AttemptClock } from '../shared/monty';
 import { CloudStatus } from './components/CloudStatus';
 import { PdfCard } from './components/PdfCard';
-import { openPdfInApp } from './services/openPdf';
+import { usePdfViewer } from './components/FileViewer';
 import { VocabularyExam } from './components/VocabularyExam';
 type Tab = 'library' | 'learn' | 'quiz' | 'results' | 'settings' | 'bookmarks' | 'notes';
 const date = (time: number) =>
@@ -98,6 +98,7 @@ export default function App({
   const upload = useRef<HTMLInputElement>(null),
     controller = useRef<AbortController | null>(null),
     main = useRef<HTMLElement>(null);
+  const { openPdf, pdfViewer } = usePdfViewer(setToast);
   useEffect(() => {
     if (!toast) return;
     const t = setTimeout(() => setToast(''), 6500);
@@ -730,7 +731,7 @@ export default function App({
                             </button>
                             <button
                               className="secondary"
-                              onClick={() => void openPdfInApp({ ...doc, legacy: true }, notify)}
+                              onClick={() => openPdf({ ...doc, legacy: true })}
                             >
                               Open PDF
                             </button>
@@ -1029,6 +1030,7 @@ export default function App({
           </nav>
         )}
       </main>
+      {pdfViewer}
       {toast && (
         <div className="toast" role="alert">
           <span>{toast}</span>

@@ -21,7 +21,7 @@ import {
   mathItemsV3,
   MATH_LAYOUT_VERSION,
 } from '../pdf/content';
-import { workedQuestions } from '../pdf/workedQuestions';
+import { repairWorkedChoices, workedQuestions } from '../pdf/workedQuestions';
 import { QuestionParser } from '../pdf/questions';
 import { repairMathBank } from '../core/repairMathBank';
 import { extractGeneral } from './api';
@@ -75,12 +75,19 @@ async function loadBank(id: string) {
                 Math.min(bank.mathLayoutVersion ?? 2, 3),
               ),
               corrected = new MathsParser();
+            const pages: PageData[] = [];
             for (let n = 1; n <= pdf.count; n++) {
-              const page = await pdf.page(n);
-              previous.add(page);
-              corrected.add(page);
+              const page =
+                (await readJob<PageData>(`page-v2-${source.id}-${n}`)) ?? (await pdf.page(n));
+              pages.push(page);
+              if ((bank.mathLayoutVersion ?? 1) < 4) {
+                previous.add(page);
+                corrected.add(page);
+              }
             }
-            bank = repairMathBank(bank, previous.finish(id), corrected.finish(id));
+            if ((bank.mathLayoutVersion ?? 1) < 4)
+              bank = repairMathBank(bank, previous.finish(id), corrected.finish(id));
+            bank = { ...repairWorkedChoices(bank, pages), mathLayoutVersion: MATH_LAYOUT_VERSION };
             // This is a derived local view, not an overwrite of the shared bank.
             await saveJob(key, { hash, bank });
           } finally {

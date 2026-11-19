@@ -2,7 +2,11 @@ import { expect, it } from 'vitest';
 import { OPS } from 'pdfjs-dist/legacy/build/pdf.mjs';
 import { pageGraphics } from '../src/pdf/graphics';
 import { linesOf, type PageData, type TextItem } from '../src/pdf/parser';
-import { workedQuestions, workedSolutionRegions } from '../src/pdf/workedQuestions';
+import {
+  repairWorkedChoices,
+  workedQuestions,
+  workedSolutionRegions,
+} from '../src/pdf/workedQuestions';
 
 const line = (text: string, y: number, x = 25): TextItem => ({
   text,
@@ -76,3 +80,45 @@ it('leaves an unmarked multiple-choice answer for recovery with its original sol
   expect(result?.bank.warnings[0]).toMatch(/^Question 1:/);
   expect(result?.fragments[0].text).toContain('Solution: 6 + 8 = 14');
 });
+
+it.each([125, 129])(
+  'separates a solution beside the choices at y=%s and repairs a saved bank',
+  async (y) => {
+    const pages = [
+      page(1, [
+        line('1. What is the value of x?', 100),
+        line('a) 8', 125),
+        line('b) 5', 125, 90),
+        line('c) 4', 125, 150),
+        line('d) 2', 125, 210),
+        line('3x − 4 = 20', y, 275),
+        line('Solution:', 146),
+        line('x = 8', 146, 275),
+        line('Answer: A', 165),
+        line('2. Which equation is correct?', 200),
+        line('a) y = 5', 225),
+        line('b)', 225, 150),
+        line('y = 3', 225, 205),
+        line('Solution:', 250),
+        line('Both sides equal 3', 250, 205),
+        line('Answer: B', 265),
+      ]),
+    ];
+    const result = await workedQuestions(pages, 'bank', async () => ({ images: [], fills: [] }));
+    const bank = result!.bank;
+    const [corrected, equationChoice] = bank.questions;
+    expect(corrected.options.map((option) => option.text)).toEqual(['8', '5', '4', '2']);
+    expect(corrected.sourceSolution?.text).toBe('3x − 4 = 20\nx = 8\nAnswer: A');
+    expect(equationChoice.options[1].text).toBe('y = 3');
+    const [openingCrop] = workedSolutionRegions(pages)['1-1'];
+    expect(openingCrop.bounds[0]).toBeGreaterThan(234);
+    expect(openingCrop.bounds[1]).toBeLessThan(y - 12);
+
+    const saved = structuredClone(bank);
+    saved.questions[0].options[3].text = '2 3x − 4 = 20';
+    saved.questions[0].sourceSolution!.text = 'x = 8\nAnswer: A';
+    expect(repairWorkedChoices(saved, pages)).toEqual(bank);
+    saved.questions[0].options[3].text = 'My edited choice';
+    expect(repairWorkedChoices(saved, pages)).toEqual(saved);
+  },
+);

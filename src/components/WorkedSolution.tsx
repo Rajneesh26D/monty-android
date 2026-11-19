@@ -33,8 +33,8 @@ export function WorkedSolution({
       <RichText text={solution.text} />
     </p>
   );
-  const figures = images?.map(({ page, url }) => (
-    <figure key={page}>
+  const figures = images?.map(({ page, url }, index) => (
+    <figure key={`${page}-${index}`}>
       <img src={url} alt={`Worked solution from PDF page ${page}`} />
       <figcaption>PDF page {page}</figcaption>
     </figure>
