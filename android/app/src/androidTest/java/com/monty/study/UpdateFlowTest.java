@@ -73,6 +73,14 @@ public class UpdateFlowTest {
         try(InputStream in=new ParcelFileDescriptor.AutoCloseInputStream(descriptor);FileOutputStream out=new FileOutputStream(apk)){FileTransfer.copy(in,out,300L*1024*1024);}
         assertTrue(apk.length()>1000000);
         Instrumentation instrumentation=InstrumentationRegistry.getInstrumentation();
+        android.net.Uri uri = androidx.core.content.FileProvider.getUriForFile(c, c.getPackageName()+".fileprovider", apk);
+        Intent implicit = new Intent(Intent.ACTION_VIEW).setDataAndType(uri, "application/vnd.android.package-archive");
+        assertTrue("A competing APK handler must be installed for this test",
+            c.getPackageManager().queryIntentActivities(implicit, 0).stream().anyMatch(
+                match -> match.activityInfo.packageName.equals(instrumentation.getContext().getPackageName())));
+        Intent installer = UpdateService.systemInstaller(c, uri);
+        assertNotNull("Monty must target Android's installer explicitly", installer.getComponent());
+        assertNotEquals(instrumentation.getContext().getPackageName(), installer.getComponent().getPackageName());
         String nextName=InstrumentationRegistry.getArguments().getString("nextName");
         int nextCode=Integer.parseInt(InstrumentationRegistry.getArguments().getString("nextCode"));
         java.security.MessageDigest digest=java.security.MessageDigest.getInstance("SHA-256");

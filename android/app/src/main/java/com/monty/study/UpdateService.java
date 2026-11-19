@@ -166,10 +166,27 @@ final class UpdateService {
             if(c.getPackageName().equals(old.getAppPackageName()))try{installer.abandonSession(old.getSessionId());}catch(Exception ignored){}
         }
         Uri uri=FileProvider.getUriForFile(c,c.getPackageName()+".fileprovider",file);
-        Intent intent=new Intent(Intent.ACTION_VIEW).setDataAndType(uri,"application/vnd.android.package-archive")
+        return systemInstaller(c, uri);
+    }
+    static Intent systemInstaller(Context context, Uri uri) throws IOException {
+        Intent intent = new Intent(Intent.ACTION_INSTALL_PACKAGE)
+            .setDataAndType(uri, "application/vnd.android.package-archive")
             .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-        intent.setClipData(ClipData.newRawUri("Monty update",uri));
-        return intent;
+        intent.setClipData(ClipData.newRawUri("Monty update", uri));
+        PackageManager manager = context.getPackageManager();
+        int flags = PackageManager.MATCH_DEFAULT_ONLY | PackageManager.MATCH_SYSTEM_ONLY;
+        // Some Android builds expose the system installer only under VIEW.
+        // Pin either action to a system component so APK defaults cannot intercept it.
+        for (String action : new String[]{Intent.ACTION_INSTALL_PACKAGE, Intent.ACTION_VIEW}) {
+            intent.setAction(action);
+            for (ResolveInfo match : manager.queryIntentActivities(intent, flags)) {
+                ActivityInfo activity = match.activityInfo;
+                if (activity != null && activity.exported && activity.enabled) {
+                    return intent.setClassName(activity.packageName, activity.name);
+                }
+            }
+        }
+        throw new IOException("Android's system package installer is unavailable. Enable it in Android Settings and retry");
     }
     static void launchInstaller(Activity activity,Intent intent)throws Exception {
         prefs(activity).edit().putLong("installVersion",installedCode(activity))
